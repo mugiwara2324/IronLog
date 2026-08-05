@@ -87,6 +87,16 @@ export default function WorkoutActive() {
     loadExercises();
   }, [id]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      saveCurrentState();
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [exercises]);
+
   async function toggleExercise(exerciseId: number, done: boolean) {
     await db.activeWorkoutExercises.update(exerciseId, {
       done,
@@ -267,6 +277,21 @@ export default function WorkoutActive() {
     }
 
     navigate("/");
+  }
+
+  async function saveCurrentState() {
+    for (const item of exercises) {
+      await db.activeWorkoutExercises.update(item.id, {
+        done: item.done,
+        sets: item.sets,
+      });
+    }
+
+    if (activeWorkoutId) {
+      await db.activeWorkout.update(activeWorkoutId, {
+        updatedAt: new Date(),
+      });
+    }
   }
 
   return (

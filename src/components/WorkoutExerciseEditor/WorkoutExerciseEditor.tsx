@@ -53,6 +53,8 @@ flex
 items-center
 justify-center
 p-5
+overflow-hidden
+z-50
 "
     >
       <div
@@ -62,6 +64,8 @@ rounded-3xl
 p-6
 w-full
 max-w-md
+max-h-[85vh]
+overflow-y-auto
 "
       >
         <h2

@@ -43,20 +43,31 @@ export default function Home() {
     }
 
     /*
-      Création d'une nouvelle séance active
+      Si une séance existe déjà,
+      on la reprend au lieu d'en créer une nouvelle
     */
 
-    await db.activeWorkout.clear();
+    const existingActive = await db.activeWorkout
+      .where("workoutId")
+      .equals(workout.id)
+      .first();
 
-    await db.activeWorkoutExercises.clear();
+    if (existingActive) {
+      navigate(`/workout-active/${workout.id}`);
+      return;
+    }
 
-    // const activeId = await db.activeWorkout.add({
-    //   workoutId: workout.id,
+    /*
+      Création de la séance active
+    */
 
-    //   startedAt: new Date(),
+    await db.activeWorkout.add({
+      workoutId: workout.id,
 
-    //   updatedAt: new Date(),
-    // });
+      startedAt: new Date(),
+
+      updatedAt: new Date(),
+    });
 
     const exercises = await db.workoutExercises
       .where("workoutId")
@@ -88,6 +99,8 @@ export default function Home() {
         comment: "",
       })),
     );
+
+    await load();
 
     navigate(`/workout-active/${workout.id}`);
   }

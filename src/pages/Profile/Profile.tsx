@@ -30,9 +30,38 @@ export default function Profile() {
 
     setProfile(data ?? null);
 
+    /*
+    =========================
+    Composition corporelle
+    =========================
+  */
+
     const bodyData = await db.bodyHistory.orderBy("date").reverse().first();
 
-    setBody(bodyData ?? null);
+    if (bodyData) {
+      const fatKg =
+        bodyData.bodyFat !== undefined
+          ? (bodyData.weight * bodyData.bodyFat) / 100
+          : null;
+
+      const leanMass =
+        bodyData.leanMass ??
+        (fatKg !== null ? bodyData.weight - fatKg : undefined);
+
+      setBody({
+        ...bodyData,
+
+        leanMass,
+      });
+    } else {
+      setBody(null);
+    }
+
+    /*
+    =========================
+    Evolution corporelle
+    =========================
+  */
 
     const bodyHistory = await db.bodyHistory.orderBy("date").toArray();
 
@@ -44,6 +73,24 @@ export default function Profile() {
       const start = bodyHistory[0];
 
       const current = bodyHistory[bodyHistory.length - 1];
+
+      const startFatKg =
+        start.bodyFat !== undefined
+          ? (start.weight * start.bodyFat) / 100
+          : null;
+
+      const currentFatKg =
+        current.bodyFat !== undefined
+          ? (current.weight * current.bodyFat) / 100
+          : null;
+
+      const startLeanMass =
+        start.leanMass ??
+        (startFatKg !== null ? start.weight - startFatKg : undefined);
+
+      const currentLeanMass =
+        current.leanMass ??
+        (currentFatKg !== null ? current.weight - currentFatKg : undefined);
 
       setBodyEvolution({
         weight: current.weight - start.weight,
@@ -59,11 +106,17 @@ export default function Profile() {
             : null,
 
         leanMass:
-          current.leanMass !== undefined && start.leanMass !== undefined
-            ? current.leanMass - start.leanMass
+          currentLeanMass !== undefined && startLeanMass !== undefined
+            ? currentLeanMass - startLeanMass
             : null,
       });
     }
+
+    /*
+    =========================
+    Statistiques entraînement
+    =========================
+  */
 
     const workouts = await db.workoutHistory
       .orderBy("date")

@@ -43,9 +43,9 @@ export default function Home() {
     }
 
     /*
-      Si une séance existe déjà,
-      on la reprend au lieu d'en créer une nouvelle
-    */
+    Vérifie si une séance est déjà en cours.
+    Si oui, on reprend celle existante.
+  */
 
     const existingActive = await db.activeWorkout
       .where("workoutId")
@@ -58,10 +58,14 @@ export default function Home() {
     }
 
     /*
-      Création de la séance active
-    */
+    Création d'une nouvelle séance active
+  */
 
-    await db.activeWorkout.add({
+    await db.activeWorkout.clear();
+
+    await db.activeWorkoutExercises.clear();
+
+    const activeWorkoutId = await db.activeWorkout.add({
       workoutId: workout.id,
 
       startedAt: new Date(),
@@ -88,7 +92,6 @@ export default function Home() {
           {
             length: exercise.sets,
           },
-
           () => ({
             weight: exercise.weight,
 
@@ -99,6 +102,15 @@ export default function Home() {
         comment: "",
       })),
     );
+
+    /*
+    Mise à jour de la home pour afficher
+    "Reprendre ma séance"
+  */
+
+    await db.activeWorkout.update(activeWorkoutId, {
+      updatedAt: new Date(),
+    });
 
     await load();
 

@@ -66,6 +66,7 @@ w-full
 max-w-md
 max-h-[85vh]
 overflow-y-auto
+translate-y-[-3%]
 "
       >
         <h2

@@ -2,13 +2,15 @@ import { db } from "../database/db";
 
 export async function createExercise(
   name: string,
-
-  muscleGroup: string,
+  muscles: string[],
+  description: string = "",
 ) {
   return await db.exercises.add({
     name,
 
-    muscleGroup,
+    description,
+
+    muscles,
 
     createdAt: new Date(),
   });

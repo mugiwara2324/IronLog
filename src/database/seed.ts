@@ -10,144 +10,143 @@ export async function seedExercises() {
   const exercises = [
     {
       name: "Développé couché haltères",
-      muscleGroup: "Pectoraux",
+      muscles: ["Pectoraux", "Triceps", "Épaules"],
     },
 
     {
       name: "Développé incliné haltères",
-      muscleGroup: "Pectoraux",
+      muscles: ["Pectoraux", "Épaules", "Triceps"],
     },
 
     {
       name: "Développé épaules assis",
-      muscleGroup: "Épaules",
+      muscles: ["Épaules", "Triceps"],
     },
 
     {
       name: "Pec Fly",
-      muscleGroup: "Pectoraux",
+      muscles: ["Pectoraux"],
     },
 
     {
       name: "Élévations latérales",
-      muscleGroup: "Épaules",
+      muscles: ["Épaules"],
     },
 
     {
       name: "Extension triceps à la poulie",
-      muscleGroup: "Triceps",
+      muscles: ["Triceps"],
     },
 
     {
       name: "Extension triceps un bras",
-      muscleGroup: "Triceps",
+      muscles: ["Triceps"],
     },
 
     {
       name: "Tirage vertical devant",
-      muscleGroup: "Dos",
+      muscles: ["Dos", "Biceps"],
     },
 
     {
       name: "Rowing poulie prise serrée",
-      muscleGroup: "Dos",
+      muscles: ["Dos", "Biceps"],
     },
 
     {
       name: "Rowing haltères",
-      muscleGroup: "Dos",
+      muscles: ["Dos", "Biceps"],
     },
 
     {
       name: "Pull-over",
-      muscleGroup: "Dos",
+      muscles: ["Dos", "Pectoraux"],
     },
 
     {
       name: "Rear Delt",
-      muscleGroup: "Arrière épaule",
+      muscles: ["Épaules"],
     },
 
     {
       name: "Curl barre EZ",
-      muscleGroup: "Biceps",
+      muscles: ["Biceps", "Avant-bras"],
     },
 
     {
       name: "Curl poulie",
-      muscleGroup: "Biceps",
+      muscles: ["Biceps"],
     },
 
     {
       name: "Presse",
-      muscleGroup: "Jambes",
+      muscles: ["Quadriceps", "Fessiers", "Ischios"],
     },
 
     {
       name: "Leg Curl",
-      muscleGroup: "Ischio",
+      muscles: ["Ischios"],
     },
 
     {
       name: "Leg Extension",
-      muscleGroup: "Quadriceps",
+      muscles: ["Quadriceps"],
     },
 
     {
       name: "Crunch machine",
-      muscleGroup: "Abdos",
+      muscles: ["Abdos"],
     },
 
     {
       name: "Hip Abduction",
-      muscleGroup: "Fessiers",
+      muscles: ["Fessiers"],
     },
 
     {
       name: "Hip Adduction",
-      muscleGroup: "Adducteurs",
+      muscles: ["Adducteurs"],
     },
 
     {
       name: "Mollets",
-      muscleGroup: "Mollets",
+      muscles: ["Mollets"],
     },
 
     {
       name: "Pompes classiques",
-      muscleGroup: "Pectoraux",
+      muscles: ["Pectoraux", "Triceps", "Épaules"],
     },
 
     {
       name: "Pompes diamant",
-      muscleGroup: "Triceps",
+      muscles: ["Triceps", "Pectoraux"],
     },
 
     {
       name: "Pompes piquées",
-      muscleGroup: "Épaules",
+      muscles: ["Épaules", "Triceps"],
     },
 
     {
       name: "Pompes claquées",
-      muscleGroup: "Explosivité",
+      muscles: ["Pectoraux", "Explosivité"],
     },
 
     {
       name: "Pompes archers",
-      muscleGroup: "Explosivité",
+      muscles: ["Pectoraux", "Épaules"],
     },
 
     {
       name: "Pompes déclinées",
-      muscleGroup: "Pectoraux",
+      muscles: ["Pectoraux", "Épaules", "Triceps"],
     },
   ];
 
   await db.exercises.bulkAdd(
     exercises.map((e) => ({
       ...e,
-
       createdAt: new Date(),
     })),
   );

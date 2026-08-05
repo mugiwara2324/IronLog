@@ -78,7 +78,7 @@ text-neutral-400
 mt-1
 "
             >
-              {exercise.muscleGroup}
+              {exercise.muscles?.join(", ")}
             </p>
           </div>
         ))}

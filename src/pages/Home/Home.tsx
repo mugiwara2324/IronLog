@@ -50,13 +50,13 @@ export default function Home() {
 
     await db.activeWorkoutExercises.clear();
 
-    const activeId = await db.activeWorkout.add({
-      workoutId: workout.id,
+    // const activeId = await db.activeWorkout.add({
+    //   workoutId: workout.id,
 
-      startedAt: new Date(),
+    //   startedAt: new Date(),
 
-      updatedAt: new Date(),
-    });
+    //   updatedAt: new Date(),
+    // });
 
     const exercises = await db.workoutExercises
       .where("workoutId")

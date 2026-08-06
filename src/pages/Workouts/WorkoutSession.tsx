@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { useNavigate } from "react-router-dom";
 
-import { db } from "../../database/db";
+import { supabase } from "../../lib/supabase";
 
 export default function WorkoutSession() {
   const navigate = useNavigate();
@@ -13,7 +13,7 @@ export default function WorkoutSession() {
 
   const [activeWorkoutId, setActiveWorkoutId] = useState<number | null>(null);
 
-  const [completed, setCompleted] = useState<number[]>([]);
+  const [completed, setCompleted] = useState<string[]>([]);
 
   async function loadWorkout() {
     const days = [
@@ -28,36 +28,67 @@ export default function WorkoutSession() {
 
     const today = days[new Date().getDay()];
 
-    const workout = await db.workouts.where("day").equals(today).first();
+    const {
+      data: { user },
+      error: userErr,
+    } = await supabase.auth.getUser();
 
-    if (!workout?.id) {
-      return;
+    if (userErr || !user) {
+      throw new Error("Utilisateur non authentifié");
     }
 
-    setWorkoutName(workout.name);
+    const { data: workout } = await supabase
+      .from("workouts")
+      .select("*")
+      .eq("day", today)
+      .eq("user_id", user.id)
+      .limit(1);
 
-    let active = await db.activeWorkout.toCollection().first();
+    const wk = workout && workout[0] ? workout[0] : null;
+
+    if (!wk?.id) return;
+
+    setWorkoutName(wk.name);
+
+    const { data: active } = await supabase
+      .from("active_workout")
+      .select("*")
+      .eq("user_id", user.id)
+      .limit(1);
+
+    const act = active && active[0] ? active[0] : null;
 
     /*
       Si une séance existe déjà
       et correspond à aujourd'hui
     */
 
-    if (active && active.workoutId === workout.id) {
-      setActiveWorkoutId(active.id ?? null);
+    if (act && act.workout_id === wk.id) {
+      setActiveWorkoutId(act.id ?? null);
 
-      const activeExercises = await db.activeWorkoutExercises
-        .where("workoutId")
-        .equals(workout.id)
-        .sortBy("order");
+      const { data: activeExercises } = await supabase
+        .from("active_workout_exercises")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("workout_id", wk.id);
+
+      const sortedActiveExercises = (activeExercises ?? [])
+        .slice()
+        .sort(
+          (a: any, b: any) => (Number(a.order) || 0) - (Number(b.order) || 0),
+        );
 
       const fullExercises = await Promise.all(
-        activeExercises.map(async (item) => {
-          const exercise = await db.exercises.get(item.exerciseId);
+        (sortedActiveExercises ?? []).map(async (item: any) => {
+          const { data: exercise } = await supabase
+            .from("exercises")
+            .select("*")
+            .eq("id", item.exercise_id)
+            .limit(1);
 
           return {
             ...item,
-            exercise,
+            exercise: exercise && exercise[0] ? exercise[0] : null,
           };
         }),
       );
@@ -65,7 +96,9 @@ export default function WorkoutSession() {
       setExercises(fullExercises);
 
       setCompleted(
-        activeExercises.filter((item) => item.done).map((item) => item.id!),
+        (activeExercises ?? [])
+          .filter((item: any) => item.done)
+          .map((item: any) => item.id),
       );
 
       return;
@@ -75,108 +108,109 @@ export default function WorkoutSession() {
       Nouvelle séance
     */
 
-    const activeId = await db.activeWorkout.add({
-      workoutId: workout.id,
+    const { data: insertedActive, error: activeError } = await supabase
+      .from("active_workout")
+      .insert({
+        user_id: user.id,
+        workout_id: wk.id,
+        started_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
 
-      startedAt: new Date(),
+    if (activeError) {
+      throw activeError;
+    }
 
-      updatedAt: new Date(),
-    });
+    setActiveWorkoutId(insertedActive?.id ?? null);
 
-    setActiveWorkoutId(activeId);
+    const { data: workoutExercises } = await supabase
+      .from("workout_exercises")
+      .select("*")
+      .eq("workout_id", wk.id);
 
-    const workoutExercises = await db.workoutExercises
-      .where("workoutId")
-      .equals(workout.id)
-      .sortBy("order");
+    const sortedWorkoutExercises = (workoutExercises ?? [])
+      .slice()
+      .sort(
+        (a: any, b: any) => (Number(a.order) || 0) - (Number(b.order) || 0),
+      );
 
-    const activeExercises = await Promise.all(
-      workoutExercises.map(async (item) => {
-        const sets = Array.from(
-          {
-            length: item.sets,
-          },
-          () => ({
-            weight: item.weight,
+    const toInsert = await Promise.all(
+      (sortedWorkoutExercises ?? []).map(async (item: any) => {
+        const sets = Array.from({ length: item.sets }, () => ({
+          weight: item.weight,
+          reps: Number(item.reps),
+        }));
 
-            reps: Number(item.reps),
-          }),
-        );
+        const { data: inserted } = await supabase
+          .from("active_workout_exercises")
+          .insert({
+            user_id: user.id,
+            workout_id: wk.id,
+            exercise_id: item.exercise_id,
+            order: item.order,
+            done: false,
+            sets,
+          })
+          .select();
 
-        const id = await db.activeWorkoutExercises.add({
-          workoutId: workout.id!,
+        const id = inserted && inserted[0] ? inserted[0].id : undefined;
 
-          exerciseId: item.exerciseId,
-
-          order: item.order,
-
-          done: false,
-
-          sets,
-        });
-
-        const exercise = await db.exercises.get(item.exerciseId);
+        const { data: exercise } = await supabase
+          .from("exercises")
+          .select("*")
+          .eq("id", item.exercise_id)
+          .limit(1);
 
         return {
           id,
-
-          workoutId: workout.id,
-
-          exerciseId: item.exerciseId,
-
+          workoutId: wk.id,
+          exerciseId: item.exercise_id,
           order: item.order,
-
           done: false,
-
           sets,
-
-          exercise,
+          exercise: exercise && exercise[0] ? exercise[0] : null,
         };
       }),
     );
 
-    setExercises(activeExercises);
+    setExercises(toInsert);
   }
 
   useEffect(() => {
     loadWorkout();
   }, []);
 
-  async function toggleExercise(id: number) {
+  async function toggleExercise(id: string) {
     const current = exercises.find((item) => item.id === id);
 
-    if (!current) {
-      return;
-    }
+    if (!current) return;
 
     const newDone = !current.done;
 
-    await db.activeWorkoutExercises.update(id, {
-      done: newDone,
-    });
+    const query = supabase
+      .from("active_workout_exercises")
+      .update({ done: newDone })
+      .eq("id", id);
+
+    await query;
 
     if (activeWorkoutId) {
-      await db.activeWorkout.update(activeWorkoutId, {
-        updatedAt: new Date(),
-      });
+      await supabase
+        .from("active_workout")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", activeWorkoutId);
     }
 
     setExercises(
       exercises.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              done: newDone,
-            }
-          : item,
+        item.id === id ? { ...item, done: newDone } : item,
       ),
     );
 
-    if (newDone) {
-      setCompleted([...completed, id]);
-    } else {
-      setCompleted(completed.filter((item) => item !== id));
-    }
+    if (newDone) setCompleted([...completed, id]);
+    else setCompleted(completed.filter((item) => item !== id));
   }
 
   return (

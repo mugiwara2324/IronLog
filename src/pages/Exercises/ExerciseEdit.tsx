@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 
-import { db } from "../../database/db";
+import { supabase } from "../../lib/supabase";
 
 export default function ExerciseEdit() {
   const { id } = useParams();
@@ -11,7 +11,7 @@ export default function ExerciseEdit() {
 
   const navigate = useNavigate();
 
-  const workoutExerciseId = Number(searchParams.get("workoutExercise"));
+  const workoutExerciseId = searchParams.get("workoutExercise");
 
   const [exercise, setExercise] = useState<any>(null);
 
@@ -25,32 +25,52 @@ export default function ExerciseEdit() {
 
   useEffect(() => {
     async function load() {
-      const exerciseData = await db.exercises.get(Number(id));
+      if (!id || !workoutExerciseId) {
+        return;
+      }
+      const { data: exerciseData } = await supabase
+        .from("exercises")
+        .select("*")
+        .eq("id", id)
+        .limit(1);
 
-      setExercise(exerciseData);
+      setExercise(exerciseData && exerciseData[0] ? exerciseData[0] : null);
 
-      const workoutData = await db.workoutExercises.get(workoutExerciseId);
+      const { data: workoutData } = await supabase
+        .from("workout_exercises")
+        .select("*")
+        .eq("id", workoutExerciseId)
+        .limit(1);
 
-      setWorkoutExercise(workoutData);
+      const wd = workoutData && workoutData[0] ? workoutData[0] : null;
 
-      if (workoutData) {
-        setSets(workoutData.sets);
+      setWorkoutExercise(wd);
 
-        setReps(workoutData.reps);
+      if (wd) {
+        setSets(wd.sets);
 
-        setWeight(workoutData.weight);
+        setReps(wd.reps);
+
+        setWeight(wd.weight);
       }
     }
 
     load();
-  }, []);
+  }, [id, workoutExerciseId]);
 
   if (!exercise || !workoutExercise) {
     return <div>Chargement...</div>;
   }
 
   async function save() {
-    const oldExercise = await db.workoutExercises.get(workoutExerciseId);
+    const { data: oldExerciseData } = await supabase
+      .from("workout_exercises")
+      .select("*")
+      .eq("id", workoutExerciseId)
+      .limit(1);
+
+    const oldExercise =
+      oldExerciseData && oldExerciseData[0] ? oldExerciseData[0] : null;
 
     if (!oldExercise) {
       return;
@@ -59,28 +79,18 @@ export default function ExerciseEdit() {
     // Vérifie si le poids a changé
 
     if (oldExercise.weight !== weight) {
-      await db.weightHistory.add({
-        exerciseId: Number(id),
-
-        oldWeight: oldExercise.weight,
-
-        newWeight: weight,
-
-        date: new Date(),
+      await supabase.from("weight_history").insert({
+        exercise_id: id,
+        old_weight: oldExercise.weight,
+        new_weight: weight,
+        date: new Date().toISOString(),
       });
     }
 
-    await db.workoutExercises.update(
-      workoutExerciseId,
-
-      {
-        sets,
-
-        reps,
-
-        weight,
-      },
-    );
+    await supabase
+      .from("workout_exercises")
+      .update({ sets, reps, weight })
+      .eq("id", workoutExerciseId);
 
     navigate(-1);
   }

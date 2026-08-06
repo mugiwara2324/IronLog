@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { db } from "../../database/db";
+import { createBodyMeasurement } from "../../services/bodyService";
 
 interface Props {
   onClose: () => void;
@@ -40,29 +40,31 @@ export default function AddBodyMeasurement({ onClose, onSave }: Props) {
       return;
     }
 
-    await db.bodyHistory.add({
-      date: new Date(),
+    try {
+      await createBodyMeasurement({
+        weight: Number(form.weight),
 
-      weight: Number(form.weight),
+        body_fat: form.bodyFat ? Number(form.bodyFat) : null,
 
-      bodyFat: form.bodyFat ? Number(form.bodyFat) : undefined,
+        muscle_mass: form.muscleMass ? Number(form.muscleMass) : null,
 
-      muscleMass: form.muscleMass ? Number(form.muscleMass) : undefined,
+        bone_mass: form.boneMass ? Number(form.boneMass) : null,
 
-      boneMass: form.boneMass ? Number(form.boneMass) : undefined,
+        water_percentage: form.waterPercentage
+          ? Number(form.waterPercentage)
+          : null,
 
-      waterPercentage: form.waterPercentage
-        ? Number(form.waterPercentage)
-        : undefined,
+        lean_mass: form.leanMass ? Number(form.leanMass) : null,
+      });
 
-      leanMass: form.leanMass ? Number(form.leanMass) : undefined,
+      onSave();
 
-      metabolicAge: form.metabolicAge ? Number(form.metabolicAge) : undefined,
-    });
+      onClose();
+    } catch (error) {
+      console.error(error);
 
-    onSave();
-
-    onClose();
+      alert("Erreur lors de l'enregistrement de la mesure");
+    }
   }
 
   return (

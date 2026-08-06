@@ -12,7 +12,12 @@ import {
 
 import AddBodyMeasurement from "./AddBodyMeasurement";
 
-import { db } from "../../database/db";
+import {
+  getBodyMeasurements,
+  deleteBodyMeasurement,
+} from "../../services/bodyService";
+
+import { getProfile } from "../../services/profileService";
 
 export default function BodyProgress() {
   const [history, setHistory] = useState<any[]>([]);
@@ -22,16 +27,52 @@ export default function BodyProgress() {
   const [profile, setProfile] = useState<any>(null);
 
   async function loadHistory() {
-    const data = await db.bodyHistory.orderBy("date").reverse().toArray();
+    try {
+      const data = await getBodyMeasurements();
 
-    setHistory(data);
+      const formatted = data
+        .map((item) => ({
+          ...item,
 
-    const profileData = await db.profile.toCollection().first();
+          weight:
+            item.weight !== null && item.weight !== undefined
+              ? Number(item.weight)
+              : undefined,
+          bodyFat:
+            item.body_fat !== null && item.body_fat !== undefined
+              ? Number(item.body_fat)
+              : undefined,
+          muscleMass:
+            item.muscle_mass !== null && item.muscle_mass !== undefined
+              ? Number(item.muscle_mass)
+              : undefined,
+          boneMass:
+            item.bone_mass !== null && item.bone_mass !== undefined
+              ? Number(item.bone_mass)
+              : undefined,
+          waterPercentage:
+            item.water_percentage !== null &&
+            item.water_percentage !== undefined
+              ? Number(item.water_percentage)
+              : undefined,
+          leanMass:
+            item.lean_mass !== null && item.lean_mass !== undefined
+              ? Number(item.lean_mass)
+              : undefined,
+        }))
+        .reverse();
 
-    setProfile(profileData ?? null);
+      setHistory(formatted);
+
+      const profileData = await getProfile();
+
+      setProfile(profileData);
+    } catch (error) {
+      console.error(error);
+    }
   }
 
-  async function deleteMeasurement(id: number) {
+  async function deleteMeasurement(id: string) {
     const confirmDelete = window.confirm(
       "Supprimer cette mesure ? Cette action est irréversible.",
     );
@@ -40,9 +81,13 @@ export default function BodyProgress() {
       return;
     }
 
-    await db.bodyHistory.delete(id);
+    try {
+      await deleteBodyMeasurement(id);
 
-    loadHistory();
+      loadHistory();
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   useEffect(() => {
@@ -68,8 +113,12 @@ export default function BodyProgress() {
   }
 
   const bmi =
-    latest && profile
-      ? (latest.weight / Math.pow(profile.height / 100, 2)).toFixed(1)
+    latest && profile && latest.weight && profile.height
+      ? Number(latest.weight) > 0 && Number(profile.height) > 0
+        ? (
+            Number(latest.weight) / Math.pow(Number(profile.height) / 100, 2)
+          ).toFixed(1)
+        : null
       : null;
 
   const fatKg =
@@ -78,20 +127,47 @@ export default function BodyProgress() {
       : null;
 
   const leanKg = latest
-    ? (latest.leanMass ?? (fatKg ? latest.weight - Number(fatKg) : undefined))
+    ? Number.isFinite(Number(latest.leanMass))
+      ? Number(latest.leanMass)
+      : fatKg
+        ? Number(latest.weight) - Number(fatKg)
+        : undefined
     : null;
 
   const metabolicAge = calculateMetabolicAge();
 
-  const chartData = [...history].reverse().map((item) => ({
-    date: new Date(item.date).toLocaleDateString(),
+  const chartData = [...history].reverse().map((item) => {
+    const bodyFatKg =
+      item.bodyFat !== undefined
+        ? Number(((item.weight * item.bodyFat) / 100).toFixed(1))
+        : undefined;
 
-    weight: item.weight,
+    const leanMassKg =
+      item.leanMass !== undefined && Number.isFinite(Number(item.leanMass))
+        ? Number(item.leanMass)
+        : item.bodyFat !== undefined && Number.isFinite(Number(item.weight))
+          ? Number(
+              (item.weight - item.weight * (item.bodyFat / 100)).toFixed(1),
+            )
+          : undefined;
 
-    bodyFat: item.bodyFat,
+    const leanMassPercent =
+      item.leanMass !== undefined && Number.isFinite(Number(item.leanMass))
+        ? Number(((Number(item.leanMass) / item.weight) * 100).toFixed(1))
+        : item.bodyFat !== undefined
+          ? Number((100 - item.bodyFat).toFixed(1))
+          : undefined;
 
-    muscleMass: item.muscleMass,
-  }));
+    return {
+      date: new Date(item.date).toLocaleDateString(),
+      weight: item.weight,
+      bodyFat: item.bodyFat,
+      bodyFatKg,
+      muscleMass: item.muscleMass,
+      leanMassKg,
+      leanMassPercent,
+    };
+  });
 
   function calculateMetabolicAge() {
     if (!latest || !profile) {
@@ -260,16 +336,27 @@ export default function BodyProgress() {
           </div>
         </div>
       )}
-      <ChartCard title="Evolution du poids" data={chartData} keyName="weight" />
+      <ChartCard
+        title="Evolution du poids"
+        data={chartData}
+        dataKey="weight"
+        unit="kg"
+      />
       <ChartCard
         title="Evolution masse grasse"
         data={chartData}
-        keyName="bodyFat"
+        toggleOptions={[
+          { label: "%", dataKey: "bodyFat", unit: "%" },
+          { label: "kg", dataKey: "bodyFatKg", unit: "kg" },
+        ]}
       />
       <ChartCard
-        title="Evolution masse musculaire"
+        title="Evolution masse maigre"
         data={chartData}
-        keyName="muscleMass"
+        toggleOptions={[
+          { label: "%", dataKey: "leanMassPercent", unit: "%" },
+          { label: "kg", dataKey: "leanMassKg", unit: "kg" },
+        ]}
       />
       {history.length > 0 && (
         <div className="mt-8">
@@ -366,12 +453,30 @@ export default function BodyProgress() {
 function ChartCard({
   title,
   data,
-  keyName,
+  dataKey,
+  unit,
+  toggleOptions,
 }: {
   title: string;
   data: any[];
-  keyName: string;
+  dataKey?: string;
+  unit?: string;
+  toggleOptions?: Array<{
+    label: string;
+    dataKey: string;
+    unit: string;
+  }>;
 }) {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const currentOption = toggleOptions
+    ? toggleOptions[selectedIndex]
+    : { dataKey, unit };
+
+  if (!currentOption.dataKey || !currentOption.unit) {
+    return null;
+  }
+
   return (
     <div
       className="
@@ -381,29 +486,64 @@ function ChartCard({
       p-5
       "
     >
-      <h3
-        className="
-        font-bold
-        mb-4
-        "
-      >
-        {title}
-      </h3>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-4">
+          <h3
+            className="
+            font-bold
+            mb-0
+            "
+          >
+            {title}
+          </h3>
 
-      <div className="h-64">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
+          {toggleOptions && (
+            <div className="flex gap-2">
+              {toggleOptions.map((option, index) => (
+                <button
+                  key={option.label}
+                  type="button"
+                  onClick={() => setSelectedIndex(index)}
+                  className={`rounded-2xl border px-3 py-2 text-sm font-semibold ${
+                    selectedIndex === index
+                      ? "border-white bg-white text-black"
+                      : "border-neutral-700 text-neutral-400"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
-            <XAxis dataKey="date" />
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data}>
+              <CartesianGrid strokeDasharray="3 3" />
 
-            <YAxis />
+              <XAxis dataKey="date" />
 
-            <Tooltip />
+              <YAxis
+                tickFormatter={(value) =>
+                  typeof value === "number"
+                    ? `${value}${currentOption.unit}`
+                    : String(value)
+                }
+              />
 
-            <Line type="monotone" dataKey={keyName} strokeWidth={3} />
-          </LineChart>
-        </ResponsiveContainer>
+              <Tooltip
+                formatter={(value: any) => `${value}${currentOption.unit}`}
+              />
+
+              <Line
+                type="monotone"
+                dataKey={currentOption.dataKey}
+                strokeWidth={3}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );

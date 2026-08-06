@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import AddProgressPhoto from "./AddProgressPhoto";
 
-import { db } from "../../database/db";
+import { supabase } from "../../lib/supabase";
 
 export default function BodyPhotos() {
   const [photos, setPhotos] = useState<any[]>([]);
@@ -11,9 +11,16 @@ export default function BodyPhotos() {
   );
 
   async function loadPhotos() {
-    const data = await db.progressPhotos.orderBy("date").reverse().toArray();
+    const { data, error } = await supabase
+      .from("progress_photos")
+      .select("*")
+      .order("date", { ascending: false });
 
-    setPhotos(data);
+    if (error) throw error;
+
+    setPhotos(
+      (data ?? []).map((p: any) => ({ ...p, isReference: p.is_reference })),
+    );
   }
 
   const filteredPhotos =
@@ -28,19 +35,30 @@ export default function BodyPhotos() {
       return;
     }
 
-    await db.progressPhotos.delete(id);
+    await supabase.from("progress_photos").delete().eq("id", id);
 
     loadPhotos();
   }
 
   async function setReference(id: number) {
-    await db.progressPhotos.toCollection().modify({
-      isReference: false,
-    });
+    const { data: currentRefs } = await supabase
+      .from("progress_photos")
+      .select("id")
+      .eq("is_reference", true);
 
-    await db.progressPhotos.update(id, {
-      isReference: true,
-    });
+    if (currentRefs && currentRefs.length) {
+      for (const r of currentRefs) {
+        await supabase
+          .from("progress_photos")
+          .update({ is_reference: false })
+          .eq("id", r.id);
+      }
+    }
+
+    await supabase
+      .from("progress_photos")
+      .update({ is_reference: true })
+      .eq("id", id);
 
     loadPhotos();
   }

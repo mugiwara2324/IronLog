@@ -2,22 +2,54 @@ import { useEffect, useState } from "react";
 
 import { useNavigate } from "react-router-dom";
 
-import { db } from "../../database/db";
+import {
+  createWorkout,
+  getWorkouts,
+} from "../../services/supabaseWorkoutService";
+
+const defaultWorkoutForm = {
+  name: "",
+  day_of_week: 1,
+  description: "",
+};
 
 export default function Workouts() {
   const [workouts, setWorkouts] = useState<any[]>([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newWorkout, setNewWorkout] = useState(defaultWorkoutForm);
+  const [saving, setSaving] = useState(false);
 
   const navigate = useNavigate();
 
   useEffect(() => {
     async function load() {
-      const data = await db.workouts.toArray();
+      try {
+        const data = await getWorkouts();
 
-      setWorkouts(data);
+        setWorkouts(data ?? []);
+      } catch (error) {
+        console.error("Erreur chargement séances", error);
+      }
     }
 
     load();
   }, []);
+
+  async function handleCreateWorkout() {
+    setSaving(true);
+
+    try {
+      const created = await createWorkout(newWorkout);
+
+      setWorkouts((prev) => [...prev, created]);
+      setNewWorkout(defaultWorkoutForm);
+      setShowAdd(false);
+    } catch (error) {
+      console.error("Erreur création séance", error);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div>
@@ -39,6 +71,84 @@ export default function Workouts() {
         Programme hebdomadaire
       </p>
 
+      <button
+        onClick={() => setShowAdd(true)}
+        className="
+        mt-6
+        w-full
+        bg-white
+        text-black
+        rounded-2xl
+        py-4
+        font-semibold
+        "
+      >
+        + Ajouter une séance
+      </button>
+
+      {showAdd ? (
+        <div className="mt-6 space-y-4">
+          <div className="bg-neutral-900 rounded-3xl p-5 space-y-4">
+            <input
+              value={newWorkout.name}
+              onChange={(e) =>
+                setNewWorkout((prev) => ({ ...prev, name: e.target.value }))
+              }
+              placeholder="Nom de la séance"
+              className="w-full rounded-xl p-3 bg-neutral-800"
+            />
+
+            <select
+              value={newWorkout.day_of_week}
+              onChange={(e) =>
+                setNewWorkout((prev) => ({
+                  ...prev,
+                  day_of_week: Number(e.target.value),
+                }))
+              }
+              className="w-full rounded-xl p-3 bg-neutral-800"
+            >
+              <option value={1}>Lundi</option>
+              <option value={2}>Mardi</option>
+              <option value={3}>Mercredi</option>
+              <option value={4}>Jeudi</option>
+              <option value={5}>Vendredi</option>
+              <option value={6}>Samedi</option>
+              <option value={7}>Dimanche</option>
+            </select>
+
+            <textarea
+              value={newWorkout.description}
+              onChange={(e) =>
+                setNewWorkout((prev) => ({
+                  ...prev,
+                  description: e.target.value,
+                }))
+              }
+              placeholder="Description"
+              className="w-full rounded-xl p-3 bg-neutral-800 min-h-[120px]"
+            />
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleCreateWorkout}
+                disabled={saving}
+                className="flex-1 bg-white text-black rounded-2xl py-3 font-semibold"
+              >
+                {saving ? "Enregistrement..." : "Créer"}
+              </button>
+
+              <button
+                onClick={() => setShowAdd(false)}
+                className="flex-1 bg-neutral-700 text-white rounded-2xl py-3"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div
         className="
             mt-8
@@ -48,45 +158,44 @@ export default function Workouts() {
         {workouts.map((workout) => (
           <div
             key={workout.id}
-            onClick={() => {
-              navigate(`/workouts/${workout.id}`);
-            }}
             className="
                     bg-neutral-900
                     rounded-3xl
                     p-5
-                    cursor-pointer
                     "
           >
-            <h2
-              className="
-                        text-xl
-                        font-bold
-                        "
-            >
-              {workout.name}
-            </h2>
+            <div className="flex justify-between items-start gap-4">
+              <div
+                className="cursor-pointer"
+                onClick={() => navigate(`/workouts/${workout.id}`)}
+              >
+                <h2 className="text-xl font-bold">{workout.name}</h2>
 
-            <p
-              className="
-                        text-neutral-400
-                        mt-2
-                        "
-            >
-              {workout.day}
-            </p>
+                <p className="text-neutral-400 mt-2">
+                  {getDayName(workout.day_of_week)}
+                </p>
 
-            <p
-              className="
-                        mt-2
-                        text-sm
-                        "
-            >
-              {workout.description}
-            </p>
+                <p className="mt-2 text-sm">{workout.description}</p>
+              </div>
+            </div>
           </div>
         ))}
       </div>
     </div>
   );
+}
+
+function getDayName(day: number) {
+  const days = [
+    "",
+    "Lundi",
+    "Mardi",
+    "Mercredi",
+    "Jeudi",
+    "Vendredi",
+    "Samedi",
+    "Dimanche",
+  ];
+
+  return days[day] ?? "";
 }

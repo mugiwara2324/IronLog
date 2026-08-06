@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { db } from "../../database/db";
+import { createProfile } from "../../services/profileService";
 
 interface Props {
   onSave: () => void;
@@ -24,27 +24,25 @@ export default function CreateProfile({ onSave }: Props) {
   async function save() {
     if (!name || !age || !height) {
       alert("Merci de remplir les informations obligatoires");
-
       return;
     }
 
-    await db.profile.add({
-      name,
+    try {
+      await createProfile({
+        name,
+        age: Number(age),
+        height: Number(height),
+        goal,
+        target_weight: targetWeight ? Number(targetWeight) : null,
+        target_body_fat: targetBodyFat ? Number(targetBodyFat) : null,
+        target_muscle_mass: targetMuscleMass ? Number(targetMuscleMass) : null,
+      });
 
-      age: Number(age),
-
-      height: Number(height),
-
-      goal,
-
-      targetWeight: targetWeight ? Number(targetWeight) : undefined,
-
-      targetBodyFat: targetBodyFat ? Number(targetBodyFat) : undefined,
-
-      targetMuscleMass: targetMuscleMass ? Number(targetMuscleMass) : undefined,
-    });
-
-    onSave();
+      onSave();
+    } catch (error) {
+      console.error(error);
+      alert("Erreur lors de la création du profil");
+    }
   }
 
   return (

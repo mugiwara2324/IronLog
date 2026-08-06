@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { db } from "../../database/db";
+import { supabase } from "../../lib/supabase";
 
 interface Props {
   mode: "create" | "edit";
 
-  workoutId?: number;
+  workoutId?: string;
 
   order?: number;
 
@@ -17,7 +17,7 @@ interface Props {
 
   onCreated?: () => void;
 
-  onUpdated?: (newExerciseId: number) => void;
+  onUpdated?: (newExerciseId: string) => void;
 }
 
 const musclesList = [
@@ -37,19 +37,12 @@ const musclesList = [
 
 export default function ExerciseFormModal({
   mode,
-
   workoutId,
-
   order,
-
   exercise,
-
   workoutExercise,
-
   onClose,
-
   onCreated,
-
   onUpdated,
 }: Props) {
   const [name, setName] = useState(exercise?.name ?? "");
@@ -64,6 +57,73 @@ export default function ExerciseFormModal({
 
   const [weight, setWeight] = useState(workoutExercise?.weight ?? 0);
 
+  const [notes, setNotes] = useState(workoutExercise?.notes ?? "");
+
+  const [results, setResults] = useState<any[]>([]);
+
+  const [selectedExercise, setSelectedExercise] = useState<any>(null);
+
+  /*
+    Recherche automatique
+  */
+  useEffect(() => {
+    async function searchExercises() {
+      if (!name.trim() || selectedExercise) {
+        setResults([]);
+        return;
+      }
+
+      const search = name.toLowerCase().replace(/\s+/g, "");
+
+      const { data } = await supabase.from("exercises").select("*").limit(100);
+
+      const filtered = (data ?? []).filter((item: any) => {
+        const itemName = item.name.toLowerCase().replace(/\s+/g, "");
+
+        return itemName.includes(search);
+      });
+
+      setResults(filtered);
+    }
+
+    const timer = setTimeout(searchExercises, 300);
+
+    return () => clearTimeout(timer);
+  }, [name, selectedExercise]);
+
+  async function selectExercise(item: any) {
+    setSelectedExercise(item);
+
+    setName(item.name);
+
+    setDescription(item.description ?? "");
+
+    setMuscles(item.muscles ?? []);
+
+    /*
+      récupération dernier usage
+    */
+
+    const { data } = await supabase
+      .from("workout_exercises")
+      .select("*")
+      .eq("exercise_id", item.id)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (data && data[0]) {
+      setSets(data[0].sets ?? 3);
+
+      setReps(data[0].reps ?? "10");
+
+      setWeight(data[0].weight ?? 0);
+
+      setNotes(data[0].notes ?? "");
+    }
+
+    setResults([]);
+  }
+
   function toggleMuscle(muscle: string) {
     if (muscles.includes(muscle)) {
       setMuscles(muscles.filter((item) => item !== muscle));
@@ -73,33 +133,44 @@ export default function ExerciseFormModal({
   }
 
   async function save() {
-    if (!name.trim()) {
-      return;
-    }
+    if (!name.trim()) return;
 
-    // =====================
-    // CREATION
-    // =====================
+    /*
+      CREATION DANS UNE SEANCE
+    */
 
     if (mode === "create") {
-      if (!workoutId) {
-        return;
+      if (!workoutId) return;
+
+      let exerciseId = selectedExercise?.id;
+
+      /*
+        Si exercice inconnu => création
+      */
+
+      if (!exerciseId) {
+        const { data: newExercise, error } = await supabase
+          .from("exercises")
+          .insert({
+            name,
+            description,
+            muscles,
+            created_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        exerciseId = newExercise.id;
       }
 
-      const exerciseId = await db.exercises.add({
-        name,
+      const { error } = await supabase.from("workout_exercises").insert({
+        workout_id: workoutId,
 
-        description,
+        exercise_id: exerciseId,
 
-        muscles,
-
-        createdAt: new Date(),
-      });
-
-      await db.workoutExercises.add({
-        workoutId,
-
-        exerciseId,
+        order_index: order ?? 0,
 
         order: order ?? 0,
 
@@ -108,7 +179,11 @@ export default function ExerciseFormModal({
         reps,
 
         weight,
+
+        notes,
       });
+
+      if (error) throw error;
 
       onCreated?.();
 
@@ -117,38 +192,22 @@ export default function ExerciseFormModal({
       return;
     }
 
-    // =====================
-    // MODIFICATION
-    // OPTION 2
-    // Création d'une copie
-    // =====================
+    /*
+      EDITION
+    */
 
     if (mode === "edit" && exercise && workoutExercise) {
-      const newExerciseId = await db.exercises.add({
-        name,
-
-        description,
-
-        muscles,
-
-        createdAt: new Date(),
-      });
-
-      await db.workoutExercises.update(
-        workoutExercise.id,
-
-        {
-          exerciseId: newExerciseId,
-
+      await supabase
+        .from("workout_exercises")
+        .update({
           sets,
-
           reps,
-
           weight,
-        },
-      );
+          notes,
+        })
+        .eq("id", workoutExercise.id);
 
-      onUpdated?.(newExerciseId);
+      onUpdated?.(exercise.id);
 
       onClose();
     }
@@ -178,20 +237,134 @@ export default function ExerciseFormModal({
         overflow-y-auto
         "
       >
-        <h2
-          className="
-          text-2xl
-          font-bold
-          "
-        >
+        <h2 className="text-2xl font-bold">
           {mode === "create" ? "Nouvel exercice" : "Modifier l'exercice"}
         </h2>
 
         <div className="mt-6 space-y-4">
+          <div className="relative">
+            <input
+              placeholder="Rechercher un exercice..."
+              value={name}
+              onChange={(e) => {
+                setSelectedExercise(null);
+
+                setName(e.target.value);
+              }}
+              className="
+              w-full
+              bg-neutral-800
+              rounded-xl
+              p-3
+              "
+            />
+
+            {results.length > 0 && (
+              <div
+                className="
+                absolute
+                top-full
+                left-0
+                right-0
+                bg-neutral-800
+                rounded-xl
+                mt-2
+                overflow-hidden
+                z-20
+                "
+              >
+                {results.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => selectExercise(item)}
+                    className="
+                    w-full
+                    text-left
+                    p-3
+                    hover:bg-neutral-700
+                    "
+                  >
+                    {item.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {selectedExercise && (
+            <p className="text-green-400 text-sm">
+              Exercice existant sélectionné
+            </p>
+          )}
+
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Description"
+            className="
+            w-full
+            bg-neutral-800
+            rounded-xl
+            p-3
+            "
+          />
+
+          <div>
+            <p className="text-neutral-400 mb-3">Muscles engagés</p>
+
+            <div className="flex flex-wrap gap-2">
+              {musclesList.map((m) => (
+                <button
+                  key={m}
+                  onClick={() => toggleMuscle(m)}
+                  className={`
+                  px-3
+                  py-2
+                  rounded-full
+                  text-sm
+                  ${
+                    muscles.includes(m)
+                      ? "bg-white text-black"
+                      : "bg-neutral-800"
+                  }
+                  `}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <input
-            placeholder="Nom de l'exercice"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            type="number"
+            value={sets}
+            onChange={(e) => setSets(Number(e.target.value))}
+            placeholder="Séries"
+            className="
+            w-full
+            bg-neutral-800
+            rounded-xl
+            p-3
+            "
+          />
+
+          <input
+            value={reps}
+            onChange={(e) => setReps(e.target.value)}
+            placeholder="Répétitions"
+            className="
+            w-full
+            bg-neutral-800
+            rounded-xl
+            p-3
+            "
+          />
+
+          <input
+            type="number"
+            value={weight}
+            onChange={(e) => setWeight(Number(e.target.value))}
+            placeholder="Poids"
             className="
             w-full
             bg-neutral-800
@@ -201,9 +374,9 @@ export default function ExerciseFormModal({
           />
 
           <textarea
-            placeholder="Description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Notes"
             className="
             w-full
             bg-neutral-800
@@ -211,95 +384,6 @@ export default function ExerciseFormModal({
             p-3
             "
           />
-
-          <div>
-            <p
-              className="
-              text-neutral-400
-              mb-3
-              "
-            >
-              Muscles engagés
-            </p>
-
-            <div
-              className="
-              flex
-              flex-wrap
-              gap-2
-              "
-            >
-              {musclesList.map((muscle) => (
-                <button
-                  key={muscle}
-                  onClick={() => toggleMuscle(muscle)}
-                  className={`
-
-                      px-3
-                      py-2
-                      rounded-full
-                      text-sm
-
-                      ${
-                        muscles.includes(muscle)
-                          ? "bg-white text-black"
-                          : "bg-neutral-800"
-                      }
-
-                      `}
-                >
-                  {muscle}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-neutral-400">Séries</label>
-
-            <input
-              type="number"
-              value={sets}
-              onChange={(e) => setSets(Number(e.target.value))}
-              className="
-              w-full
-              bg-neutral-800
-              rounded-xl
-              p-3
-              "
-            />
-          </div>
-
-          <div>
-            <label className="text-neutral-400">Répétitions</label>
-
-            <input
-              value={reps}
-              onChange={(e) => setReps(e.target.value)}
-              className="
-              w-full
-              bg-neutral-800
-              rounded-xl
-              p-3
-              "
-            />
-          </div>
-
-          <div>
-            <label className="text-neutral-400">Charge</label>
-
-            <input
-              type="number"
-              value={weight}
-              onChange={(e) => setWeight(Number(e.target.value))}
-              className="
-              w-full
-              bg-neutral-800
-              rounded-xl
-              p-3
-              "
-            />
-          </div>
         </div>
 
         <button
@@ -314,7 +398,7 @@ export default function ExerciseFormModal({
           font-semibold
           "
         >
-          {mode === "create" ? "Ajouter à la séance" : "Enregistrer"}
+          Ajouter à la séance
         </button>
 
         <button

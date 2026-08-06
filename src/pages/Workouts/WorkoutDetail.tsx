@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 
 import { useParams, useNavigate } from "react-router-dom";
 
-import { db } from "../../database/db";
+import { deleteWorkout } from "../../services/supabaseWorkoutService";
+import { getWorkoutDetails } from "../../services/workoutDetailService";
 
 export default function WorkoutDetail() {
   const { id } = useParams();
@@ -17,33 +18,47 @@ export default function WorkoutDetail() {
     async function load() {
       if (!id) return;
 
-      const workoutData = await db.workouts.get(Number(id));
+      try {
+        const workoutData = await getWorkoutDetails(id);
 
-      if (!workoutData) return;
+        if (!workoutData) {
+          return;
+        }
 
-      setWorkout(workoutData);
+        setWorkout(workoutData);
 
-      const workoutExercises = await db.workoutExercises
-        .where("workoutId")
-        .equals(Number(id))
-        .sortBy("order");
-
-      const fullExercises = await Promise.all(
-        workoutExercises.map(async (item) => {
-          const exercise = await db.exercises.get(item.exerciseId);
-
-          return {
+        const sortedExercises = [...(workoutData.workout_exercises ?? [])]
+          .sort((a, b) => a.order_index - b.order_index)
+          .map((item) => ({
             ...item,
-            exercise,
-          };
-        }),
-      );
+            exercise: item.exercises,
+          }));
 
-      setExercises(fullExercises);
+        setExercises(sortedExercises);
+      } catch (error) {
+        console.error("Erreur chargement séance :", error);
+      }
     }
 
     load();
   }, [id]);
+
+  async function handleDeleteWorkout() {
+    if (!workout?.id) return;
+
+    const confirmed = window.confirm(
+      "Supprimer cette séance ? Cette action est irréversible.",
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await deleteWorkout(workout.id);
+      navigate("/workouts");
+    } catch (error) {
+      console.error("Erreur suppression séance :", error);
+    }
+  }
 
   if (!workout) {
     return <div>Chargement...</div>;
@@ -151,6 +166,21 @@ export default function WorkoutDetail() {
         "
       >
         Modifier la séance
+      </button>
+
+      <button
+        onClick={handleDeleteWorkout}
+        className="
+        mt-4
+        w-full
+        bg-red-600
+        text-white
+        rounded-2xl
+        py-4
+        font-semibold
+        "
+      >
+        Supprimer la séance
       </button>
     </div>
   );

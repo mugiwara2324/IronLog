@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { db } from "../../database/db";
+import { getProfile } from "../../services/profileService";
+import { getBodyMeasurements } from "../../services/bodyService";
 
 import CreateProfile from "../../components/Profile/CreateProfile";
 import EditProfile from "../../components/Profile/EditProfile";
@@ -26,48 +27,67 @@ export default function Profile() {
   });
 
   async function load() {
-    const data = await db.profile.toCollection().first();
-
-    setProfile(data ?? null);
-
     /*
-    =========================
-    Composition corporelle
-    =========================
+  =========================
+  Profil utilisateur
+  =========================
   */
 
-    const bodyData = await db.bodyHistory.orderBy("date").reverse().first();
+    const profileData = await getProfile();
 
-    if (bodyData) {
+    setProfile(profileData);
+
+    /*
+  =========================
+  Mesures corporelles
+  =========================
+  */
+
+    const measurements = await getBodyMeasurements();
+
+    const bodyHistory = measurements
+      .map((item) => ({
+        ...item,
+
+        bodyFat: item.body_fat,
+
+        muscleMass: item.muscle_mass,
+
+        boneMass: item.bone_mass,
+
+        waterPercentage: item.water_percentage,
+
+        leanMass: item.lean_mass,
+      }))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    if (bodyHistory.length > 0) {
+      const latest = bodyHistory[bodyHistory.length - 1];
+
       const fatKg =
-        bodyData.bodyFat !== undefined
-          ? (bodyData.weight * bodyData.bodyFat) / 100
+        latest.bodyFat !== undefined
+          ? (latest.weight * latest.bodyFat) / 100
           : null;
 
       const leanMass =
-        bodyData.leanMass ??
-        (fatKg !== null ? bodyData.weight - fatKg : undefined);
+        latest.leanMass ?? (fatKg !== null ? latest.weight - fatKg : undefined);
 
       setBody({
-        ...bodyData,
+        ...latest,
 
         leanMass,
       });
+
+      setBodyStart(bodyHistory[0]);
     } else {
       setBody(null);
     }
 
     /*
-    =========================
-    Evolution corporelle
-    =========================
+  =========================
+  Evolution corporelle
+  =========================
   */
-
-    const bodyHistory = await db.bodyHistory.orderBy("date").toArray();
-
-    if (bodyHistory.length > 0) {
-      setBodyStart(bodyHistory[0]);
-    }
 
     if (bodyHistory.length > 1) {
       const start = bodyHistory[0];
@@ -113,45 +133,23 @@ export default function Profile() {
     }
 
     /*
-    =========================
-    Statistiques entraînement
-    =========================
+  =========================
+  Statistiques entrainement
+  =========================
+
+  TEMPORAIREMENT DESACTIVE
+  car encore IndexedDB
+
   */
 
-    const workouts = await db.workoutHistory
-      .orderBy("date")
-      .reverse()
-      .toArray();
-
-    const volume = workouts.reduce((total, item) => total + item.volume, 0);
-
-    const exercises = workouts.reduce(
-      (total, item) => total + item.completedExercises,
-      0,
-    );
-
-    let lastWorkout = null;
-
-    if (workouts.length) {
-      const last = workouts[0];
-
-      const workout = await db.workouts.get(last.workoutId);
-
-      lastWorkout = {
-        name: workout?.name ?? "Séance",
-
-        date: last.date,
-      };
-    }
-
     setWorkoutStats({
-      sessions: workouts.length,
+      sessions: 0,
 
-      volume,
+      volume: 0,
 
-      exercises,
+      exercises: 0,
 
-      last: lastWorkout,
+      last: null,
     });
   }
 
@@ -206,18 +204,18 @@ export default function Profile() {
       <div>
         <h1
           className="
-        text-3xl
-        font-bold
-        "
+          text-3xl
+          font-bold
+          "
         >
           Profil
         </h1>
 
         <p
           className="
-        mt-3
-        text-neutral-400
-        "
+          mt-3
+          text-neutral-400
+          "
         >
           Aucun profil créé
         </p>
@@ -225,14 +223,14 @@ export default function Profile() {
         <button
           onClick={() => setShowCreate(true)}
           className="
-        mt-6
-        w-full
-        bg-white
-        text-black
-        rounded-2xl
-        py-4
-        font-semibold
-        "
+          mt-6
+          w-full
+          bg-white
+          text-black
+          rounded-2xl
+          py-4
+          font-semibold
+          "
         >
           Créer mon profil
         </button>
@@ -249,31 +247,30 @@ export default function Profile() {
       </div>
     );
   }
-
   return (
     <div>
       <h1
         className="
-text-3xl
-font-bold
-"
+        text-3xl
+        font-bold
+        "
       >
         Profil
       </h1>
 
       <div
         className="
-mt-8
-bg-neutral-900
-rounded-3xl
-p-6
-"
+        mt-8
+        bg-neutral-900
+        rounded-3xl
+        p-6
+        "
       >
         <h2
           className="
-text-2xl
-font-bold
-"
+          text-2xl
+          font-bold
+          "
         >
           {profile.name}
         </h2>
@@ -284,9 +281,9 @@ font-bold
 
         <p
           className="
-mt-3
-text-neutral-400
-"
+          mt-3
+          text-neutral-400
+          "
         >
           Objectif : {profile.goal || "-"}
         </p>
@@ -294,14 +291,14 @@ text-neutral-400
         <button
           onClick={() => setShowEdit(true)}
           className="
-mt-6
-w-full
-bg-white
-text-black
-rounded-2xl
-py-4
-font-semibold
-"
+          mt-6
+          w-full
+          bg-white
+          text-black
+          rounded-2xl
+          py-4
+          font-semibold
+          "
         >
           Modifier le profil
         </button>
@@ -310,28 +307,28 @@ font-semibold
       {body && (
         <div
           className="
-mt-6
-bg-neutral-900
-rounded-3xl
-p-6
-"
+          mt-6
+          bg-neutral-900
+          rounded-3xl
+          p-6
+          "
         >
           <h3
             className="
-text-xl
-font-bold
-"
+            text-xl
+            font-bold
+            "
           >
             Composition actuelle
           </h3>
 
           <div
             className="
-grid
-grid-cols-2
-gap-4
-mt-5
-"
+            grid
+            grid-cols-2
+            gap-4
+            mt-5
+            "
           >
             <ProfileStat label="Poids" value={`${body.weight} kg`} />
 
@@ -358,66 +355,66 @@ mt-5
       {profile.goal && bodyStart && body && (
         <div
           className="
-mt-6
-bg-neutral-900
-rounded-3xl
-p-6
-"
+          mt-6
+          bg-neutral-900
+          rounded-3xl
+          p-6
+          "
         >
           <h3
             className="
-text-xl
-font-bold
-"
+            text-xl
+            font-bold
+            "
           >
             🎯 Objectifs
           </h3>
 
           <p
             className="
-mt-2
-text-neutral-400
-"
+            mt-2
+            text-neutral-400
+            "
           >
             {profile.goal}
           </p>
 
           <div
             className="
-mt-5
-space-y-5
-"
+            mt-5
+            space-y-5
+            "
           >
             <GoalProgress
               label="Poids"
               current={body.weight}
-              target={profile.targetWeight}
+              target={profile.target_weight}
               progress={calculateProgress(
                 bodyStart.weight,
                 body.weight,
-                profile.targetWeight,
+                profile.target_weight,
               )}
             />
 
             <GoalProgress
               label="Masse grasse"
               current={body.bodyFat}
-              target={profile.targetBodyFat}
+              target={profile.target_body_fat}
               progress={calculateProgress(
                 bodyStart.bodyFat,
                 body.bodyFat,
-                profile.targetBodyFat,
+                profile.target_body_fat,
               )}
             />
 
             <GoalProgress
               label="Muscle"
               current={body.muscleMass}
-              target={profile.targetMuscleMass}
+              target={profile.target_muscle_mass}
               progress={calculateProgress(
                 bodyStart.muscleMass,
                 body.muscleMass,
-                profile.targetMuscleMass,
+                profile.target_muscle_mass,
               )}
             />
           </div>
@@ -427,28 +424,28 @@ space-y-5
       {bodyEvolution && (
         <div
           className="
-mt-6
-bg-neutral-900
-rounded-3xl
-p-6
-"
+          mt-6
+          bg-neutral-900
+          rounded-3xl
+          p-6
+          "
         >
           <h3
             className="
-text-xl
-font-bold
-"
+            text-xl
+            font-bold
+            "
           >
             Evolution depuis le début
           </h3>
 
           <div
             className="
-grid
-grid-cols-2
-gap-4
-mt-5
-"
+            grid
+            grid-cols-2
+            gap-4
+            mt-5
+            "
           >
             <ProfileStat
               label="Poids"
@@ -475,28 +472,28 @@ mt-5
 
       <div
         className="
-mt-6
-bg-neutral-900
-rounded-3xl
-p-6
-"
+        mt-6
+        bg-neutral-900
+        rounded-3xl
+        p-6
+        "
       >
         <h3
           className="
-text-xl
-font-bold
-"
+          text-xl
+          font-bold
+          "
         >
           Entraînement
         </h3>
 
         <div
           className="
-grid
-grid-cols-2
-gap-4
-mt-5
-"
+          grid
+          grid-cols-2
+          gap-4
+          mt-5
+          "
         >
           <ProfileStat label="Séances" value={`${workoutStats.sessions}`} />
 
@@ -516,7 +513,9 @@ mt-5
         <EditProfile
           profile={profile}
           onClose={() => setShowEdit(false)}
-          onSave={() => load()}
+          onSave={() => {
+            load();
+          }}
         />
       )}
     </div>
@@ -525,19 +524,13 @@ mt-5
 
 function GoalProgress({
   label,
-
   current,
-
   target,
-
   progress,
 }: {
   label: string;
-
   current?: number;
-
   target?: number;
-
   progress: number;
 }) {
   if (!target) {
@@ -548,18 +541,18 @@ function GoalProgress({
     <div>
       <div
         className="
-flex
-justify-between
-text-sm
-mb-2
-"
+        flex
+        justify-between
+        text-sm
+        mb-2
+        "
       >
         <span>{label}</span>
 
         <span
           className="
-text-neutral-400
-"
+          text-neutral-400
+          "
         >
           {current ?? "-"} → {target}
         </span>
@@ -567,18 +560,18 @@ text-neutral-400
 
       <div
         className="
-h-3
-bg-neutral-800
-rounded-full
-overflow-hidden
-"
+        h-3
+        bg-neutral-800
+        rounded-full
+        overflow-hidden
+        "
       >
         <div
           className="
-h-3
-bg-white
-rounded-full
-"
+          h-3
+          bg-white
+          rounded-full
+          "
           style={{
             width: `${progress}%`,
           }}
@@ -587,10 +580,10 @@ rounded-full
 
       <p
         className="
-text-xs
-text-neutral-400
-mt-1
-"
+        text-xs
+        text-neutral-400
+        mt-1
+        "
       >
         {progress}% atteint
       </p>
@@ -598,37 +591,29 @@ mt-1
   );
 }
 
-function ProfileStat({
-  label,
-
-  value,
-}: {
-  label: string;
-
-  value: string;
-}) {
+function ProfileStat({ label, value }: { label: string; value: string }) {
   return (
     <div
       className="
-bg-neutral-800
-rounded-2xl
-p-4
-"
+      bg-neutral-800
+      rounded-2xl
+      p-4
+      "
     >
       <p
         className="
-text-neutral-400
-text-sm
-"
+        text-neutral-400
+        text-sm
+        "
       >
         {label}
       </p>
 
       <p
         className="
-font-bold
-mt-1
-"
+        font-bold
+        mt-1
+        "
       >
         {value}
       </p>

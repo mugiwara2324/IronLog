@@ -10,7 +10,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-import { db } from "../../database/db";
+import { supabase } from "../../lib/supabase";
 
 interface Props {
   exercise: any;
@@ -33,19 +33,33 @@ export default function ExerciseProgressDetail({ exercise, onClose }: Props) {
 
   useEffect(() => {
     async function load() {
-      const data = await db.weightHistory
-        .where("exerciseId")
-        .equals(exercise.id)
-        .sortBy("date");
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-      setHistory(data);
+      if (!user) {
+        setHistory([]);
+        setRecord(null);
+        return;
+      }
 
-      const bestRecord = await db.records
-        .where("exerciseId")
-        .equals(exercise.id)
-        .first();
+      const { data: historyData } = await supabase
+        .from("weight_history")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("exercise_id", exercise.id)
+        .order("date", { ascending: true });
 
-      setRecord(bestRecord ?? null);
+      setHistory(historyData ?? []);
+
+      const { data: bestRecord } = await supabase
+        .from("records")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("exercise_id", exercise.id)
+        .limit(1);
+
+      setRecord((bestRecord && bestRecord[0]) ?? null);
     }
 
     load();

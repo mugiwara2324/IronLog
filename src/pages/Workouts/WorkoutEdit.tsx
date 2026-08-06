@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { useParams, useNavigate } from "react-router-dom";
 
-import { db } from "../../database/db";
+import { supabase } from "../../lib/supabase";
 
 import ExerciseFormModal from "../../components/exercises/ExerciseFormModal";
 
@@ -20,23 +20,36 @@ export default function WorkoutEdit() {
   async function load() {
     if (!id) return;
 
-    const workoutData = await db.workouts.get(Number(id));
+    const { data: workoutData } = await supabase
+      .from("workouts")
+      .select("*")
+      .eq("id", id)
+      .limit(1);
 
-    setWorkout(workoutData);
+    setWorkout(workoutData && workoutData[0] ? workoutData[0] : null);
 
-    const data = await db.workoutExercises
-      .where("workoutId")
-      .equals(Number(id))
-      .sortBy("order");
+    const { data: data } = await supabase
+      .from("workout_exercises")
+      .select("*")
+      .eq("workout_id", id);
+
+    const sortedData = (data ?? [])
+      .slice()
+      .sort(
+        (a: any, b: any) => (Number(a.order) || 0) - (Number(b.order) || 0),
+      );
 
     const full = await Promise.all(
-      data.map(async (item) => {
-        const exercise = await db.exercises.get(item.exerciseId);
+      (sortedData ?? []).map(async (item: any) => {
+        const { data: exercise } = await supabase
+          .from("exercises")
+          .select("*")
+          .eq("id", item.exercise_id ?? item.exerciseId)
+          .limit(1);
 
         return {
           ...item,
-
-          exercise,
+          exercise: exercise && exercise[0] ? exercise[0] : null,
         };
       }),
     );
@@ -61,14 +74,26 @@ export default function WorkoutEdit() {
   }, [showAdd]);
 
   async function deleteExercise(workoutExerciseId: number) {
-    await db.workoutExercises.delete(workoutExerciseId);
+    const confirmed = window.confirm(
+      "Supprimer cet exercice de la séance ? Cette action est irréversible.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    await supabase
+      .from("workout_exercises")
+      .delete()
+      .eq("id", workoutExerciseId);
 
     const remaining = exercises.filter((item) => item.id !== workoutExerciseId);
 
     for (let i = 0; i < remaining.length; i++) {
-      await db.workoutExercises.update(remaining[i].id, {
-        order: i,
-      });
+      await supabase
+        .from("workout_exercises")
+        .update({ order: i })
+        .eq("id", remaining[i].id);
     }
 
     load();
@@ -102,9 +127,10 @@ export default function WorkoutEdit() {
     ];
 
     for (let i = 0; i < newExercises.length; i++) {
-      await db.workoutExercises.update(newExercises[i].id, {
-        order: i,
-      });
+      await supabase
+        .from("workout_exercises")
+        .update({ order: i })
+        .eq("id", newExercises[i].id);
 
       newExercises[i].order = i;
     }
@@ -114,31 +140,34 @@ export default function WorkoutEdit() {
 
   async function save() {
     for (const item of exercises) {
-      const old = await db.workoutExercises.get(item.id);
+      const { data: oldData } = await supabase
+        .from("workout_exercises")
+        .select("*")
+        .eq("id", item.id)
+        .limit(1);
+
+      const old = oldData && oldData[0] ? oldData[0] : null;
 
       if (!old) continue;
 
       if (old.weight !== item.weight) {
-        await db.weightHistory.add({
-          exerciseId: item.exercise.id,
-
-          oldWeight: old.weight,
-
-          newWeight: item.weight,
-
-          date: new Date(),
+        await supabase.from("weight_history").insert({
+          exercise_id: item.exercise.id,
+          old_weight: old.weight,
+          new_weight: item.weight,
+          date: new Date().toISOString(),
         });
       }
 
-      await db.workoutExercises.update(item.id, {
-        sets: item.sets,
-
-        reps: item.reps,
-
-        weight: item.weight,
-
-        order: item.order,
-      });
+      await supabase
+        .from("workout_exercises")
+        .update({
+          sets: item.sets,
+          reps: item.reps,
+          weight: item.weight,
+          order: item.order,
+        })
+        .eq("id", item.id);
     }
 
     navigate(-1);
@@ -312,7 +341,7 @@ export default function WorkoutEdit() {
       {showAdd && (
         <ExerciseFormModal
           mode="create"
-          workoutId={Number(id)}
+          workoutId={id}
           order={exercises.length}
           onClose={() => setShowAdd(false)}
           onCreated={() => load()}

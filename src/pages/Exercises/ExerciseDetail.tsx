@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 
-import { db } from "../../database/db";
+import { supabase } from "../../lib/supabase";
 
 import ExerciseFormModal from "../../components/exercises/ExerciseFormModal";
 
@@ -13,7 +13,7 @@ export default function ExerciseDetail() {
 
   const navigate = useNavigate();
 
-  const workoutExerciseId = Number(searchParams.get("workoutExercise"));
+  const workoutExerciseId = searchParams.get("workoutExercise");
 
   const [exercise, setExercise] = useState<any>(null);
 
@@ -23,30 +23,39 @@ export default function ExerciseDetail() {
 
   const [showEdit, setShowEdit] = useState(false);
 
-  async function load(exerciseId?: number) {
-    const currentExerciseId = exerciseId ?? Number(id);
+  async function load(exerciseId?: string) {
+    const currentExerciseId = exerciseId ?? id;
 
     if (!currentExerciseId) {
       return;
     }
 
-    const exerciseData = await db.exercises.get(currentExerciseId);
+    const { data: exerciseData } = await supabase
+      .from("exercises")
+      .select("*")
+      .eq("id", currentExerciseId)
+      .limit(1);
 
-    setExercise(exerciseData);
+    setExercise(exerciseData && exerciseData[0] ? exerciseData[0] : null);
 
     if (workoutExerciseId) {
-      const workoutData = await db.workoutExercises.get(workoutExerciseId);
+      const { data: workoutData } = await supabase
+        .from("workout_exercises")
+        .select("*")
+        .eq("id", workoutExerciseId)
+        .limit(1);
 
-      setWorkoutExercise(workoutData);
+      setWorkoutExercise(workoutData && workoutData[0] ? workoutData[0] : null);
     }
 
-    const historyData = await db.weightHistory
-      .where("exerciseId")
-      .equals(currentExerciseId)
-      .reverse()
-      .sortBy("date");
+    const { data: historyData } = await supabase
+      .from("weight_history")
+      .select("*")
+      .eq("exercise_id", currentExerciseId)
+      .order("date", { ascending: false })
+      .limit(3);
 
-    setHistory(historyData.slice(0, 3));
+    setHistory(historyData ?? []);
   }
 
   useEffect(() => {
@@ -275,7 +284,7 @@ export default function ExerciseDetail() {
           onClose={() => {
             setShowEdit(false);
           }}
-          onUpdated={(newExerciseId: number) => {
+          onUpdated={(newExerciseId: string) => {
             setShowEdit(false);
 
             load(newExerciseId);

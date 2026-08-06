@@ -1,0 +1,212 @@
+import { useEffect, useState } from "react";
+
+import { useParams } from "react-router-dom";
+
+import { supabase } from "../../lib/supabase";
+
+export default function WorkoutHistory() {
+  const { id } = useParams();
+
+  const [session, setSession] = useState<any>(null);
+
+  const [exercises, setExercises] = useState<any[]>([]);
+
+  const [openExercise, setOpenExercise] = useState<string | null>(null);
+
+  async function load() {
+    if (!id) return;
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    /*
+    Récupération dernière séance terminée
+    id = workout_id
+  */
+
+    const { data: workoutSession, error } = await supabase
+      .from("workout_sessions")
+      .select("*")
+      .eq("workout_id", id)
+      .eq("user_id", user.id)
+      .order("finished_at", {
+        ascending: false,
+      })
+      .limit(1)
+      .single();
+
+    if (error) {
+      console.error("Erreur récupération historique :", error);
+
+      return;
+    }
+
+    setSession(workoutSession);
+
+    /*
+    Récupération séries réalisées
+  */
+
+    const { data: performedSets, error: setsError } = await supabase
+      .from("performed_sets")
+      .select(
+        `
+        *,
+        exercises(
+          id,
+          name
+        )
+      `,
+      )
+      .eq("session_id", workoutSession.id);
+
+    if (setsError) {
+      console.error("Erreur récupération séries :", setsError);
+
+      return;
+    }
+
+    /*
+    Regroupement des séries par exercice
+  */
+
+    const groupedExercises: any = {};
+
+    (performedSets ?? []).forEach((set: any) => {
+      const exerciseId = set.exercise_id;
+
+      if (!groupedExercises[exerciseId]) {
+        groupedExercises[exerciseId] = {
+          id: exerciseId,
+
+          name: set.exercises?.name ?? "Exercice",
+
+          sets: [],
+        };
+      }
+
+      groupedExercises[exerciseId].sets.push(set);
+    });
+
+    setExercises(Object.values(groupedExercises));
+  }
+
+  useEffect(() => {
+    load();
+  }, [id]);
+
+  if (!session) {
+    return <div>Chargement...</div>;
+  }
+
+  return (
+    <div>
+      <h1 className="text-3xl font-bold">Séance terminée</h1>
+
+      {/* Résumé séance */}
+
+      <div
+        className="
+        mt-6
+        bg-neutral-900
+        rounded-3xl
+        p-6
+        "
+      >
+        <p>
+          Volume total :<strong> {session.volume} kg</strong>
+        </p>
+
+        <p>
+          Exercices terminés :<strong> {session.completed_exercises}</strong>
+        </p>
+
+        <p className="text-neutral-400 mt-2">
+          {new Date(session.finished_at).toLocaleString()}
+        </p>
+      </div>
+
+      {/* Exercices */}
+
+      <div className="mt-6 space-y-4">
+        {exercises.map((exercise) => {
+          const isOpen = openExercise === exercise.id;
+
+          const bestWeight = Math.max(
+            ...exercise.sets.map((set: any) => Number(set.weight)),
+          );
+
+          return (
+            <div
+              key={exercise.id}
+              className="
+              bg-neutral-900
+              rounded-3xl
+              p-5
+              cursor-pointer
+              "
+              onClick={() => setOpenExercise(isOpen ? null : exercise.id)}
+            >
+              {/* Header exercice */}
+
+              <div
+                className="
+                flex
+                justify-between
+                items-center
+                "
+              >
+                <div>
+                  <h2 className="text-xl font-bold">{exercise.name}</h2>
+
+                  <p className="text-neutral-400 mt-1">
+                    {exercise.sets.length} séries
+                  </p>
+                </div>
+
+                <div className="text-right">
+                  <p className="font-bold text-lg">{bestWeight} kg</p>
+
+                  <p className="text-neutral-400 text-sm">meilleur poids</p>
+                </div>
+              </div>
+
+              {/* Détail séries */}
+
+              {isOpen && (
+                <div
+                  className="
+                  mt-5
+                  space-y-3
+                  "
+                >
+                  {exercise.sets.map((set: any, index: number) => (
+                    <div
+                      key={index}
+                      className="
+                      bg-neutral-800
+                      rounded-2xl
+                      p-4
+                      flex
+                      justify-between
+                      "
+                    >
+                      <span>Série {index + 1}</span>
+
+                      <span className="font-semibold">
+                        {set.weight} kg × {set.reps}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

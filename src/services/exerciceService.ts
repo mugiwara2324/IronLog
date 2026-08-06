@@ -1,21 +1,30 @@
-import { db } from "../database/db";
+import { supabase } from "../lib/supabase";
 
 export async function createExercise(
   name: string,
   muscles: string[],
   description: string = "",
 ) {
-  return await db.exercises.add({
-    name,
+  const { data, error } = await supabase
+    .from("exercises")
+    .insert({
+      name,
+      muscles,
+      description,
+      created_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
 
-    description,
+  if (error) throw error;
 
-    muscles,
-
-    createdAt: new Date(),
-  });
+  return data;
 }
 
 export async function getExercises() {
-  return await db.exercises.toArray();
+  const { data, error } = await supabase.from("exercises").select("*");
+
+  if (error) throw error;
+
+  return data ?? [];
 }

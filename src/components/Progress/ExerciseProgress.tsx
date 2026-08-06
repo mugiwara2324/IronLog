@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { db } from "../../database/db";
+import { supabase } from "../../lib/supabase";
 
 import ExerciseProgressDetail from "./ExerciseProgressDetail";
 
@@ -11,34 +11,48 @@ export default function ExerciseProgress() {
 
   useEffect(() => {
     async function load() {
-      const exercises = await db.exercises.toArray();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-      const history = await db.weightHistory.toArray();
+      if (!user) {
+        return;
+      }
 
-      const dbRecords = await db.records.toArray();
+      const { data: exercises } = await supabase.from("exercises").select("*");
 
-      const data = exercises.map((exercise) => {
-        const exerciseHistory = history.filter(
-          (item) => item.exerciseId === exercise.id,
+      const { data: history } = await supabase
+        .from("weight_history")
+        .select("*")
+        .eq("user_id", user.id);
+
+      const { data: dbRecords } = await supabase
+        .from("records")
+        .select("*")
+        .eq("user_id", user.id);
+
+      const data = (exercises ?? []).map((exercise: any) => {
+        const exerciseHistory = (history ?? []).filter(
+          (item: any) => (item.exercise_id ?? item.exerciseId) === exercise.id,
         );
 
         const weightHistory = exerciseHistory.length
-          ? Math.max(...exerciseHistory.map((item) => item.newWeight))
+          ? Math.max(
+              ...exerciseHistory.map(
+                (item: any) => item.new_weight ?? item.newWeight,
+              ),
+            )
           : 0;
 
-        const record = dbRecords.find(
-          (item) => item.exerciseId === exercise.id,
+        const record = (dbRecords ?? []).find(
+          (item: any) => (item.exercise_id ?? item.exerciseId) === exercise.id,
         );
 
         return {
           ...exercise,
-
-          bestWeight: record?.maxWeight ?? weightHistory,
-
-          bestReps: record?.maxReps ?? 0,
-
-          bestVolume: record?.maxVolume ?? 0,
-
+          bestWeight: record?.max_weight ?? record?.maxWeight ?? weightHistory,
+          bestReps: record?.max_reps ?? record?.maxReps ?? 0,
+          bestVolume: record?.max_volume ?? record?.maxVolume ?? 0,
           hasRecord: !!record,
         };
       });

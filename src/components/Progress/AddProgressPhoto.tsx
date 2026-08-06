@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { db } from "../../database/db";
+import { supabase } from "../../lib/supabase";
 
 interface Props {
   onClose: () => void;
@@ -62,19 +62,32 @@ export default function AddProgressPhoto({ onClose, onSave }: Props) {
   async function save() {
     if (!image) {
       alert("Choisis une image");
-
       return;
     }
 
-    await db.progressPhotos.add({
-      date: new Date(),
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
+    if (userError || !user) {
+      alert("Utilisateur non connecté");
+      return;
+    }
+
+    const { error } = await supabase.from("progress_photos").insert({
+      user_id: user.id,
+      date: new Date().toISOString(),
       image,
-
       category,
-
       note,
+      is_reference: false,
     });
+
+    if (error) {
+      console.error("Erreur ajout photo :", error);
+      throw error;
+    }
 
     onSave();
 

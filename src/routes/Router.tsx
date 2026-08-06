@@ -2,47 +2,149 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import MobileLayout from "../layouts/MobileLayout";
 
+import ProtectedRoute from "../auth/ProtectedRoute";
+
 import Home from "../pages/Home/Home";
 import Workouts from "../pages/Workouts/Workouts";
 import WorkoutDetail from "../pages/Workouts/WorkoutDetail";
 import WorkoutSession from "../pages/Workouts/WorkoutSession.tsx";
 import WorkoutEdit from "../pages/Workouts/WorkoutEdit";
 import WorkoutActive from "../pages/WorkoutActive/WorkoutActive";
+import WorkoutHistory from "../pages/WorkoutHistory/WorkoutHistory.tsx";
+
 import Progress from "../pages/Progress/Progress";
 import Photos from "../pages/Photos/Photos";
 import Profile from "../pages/Profile/Profile";
+
 import Exercises from "../pages/Exercises/Exercises";
 import ExerciseDetail from "../pages/Exercises/ExerciseDetail";
 import ExerciseEdit from "../pages/Exercises/ExerciseEdit";
+
+import Login from "../auth/Login";
+import Register from "../auth/Register";
 
 export default function Router() {
   return (
     <BrowserRouter>
       <MobileLayout>
         <Routes>
-          <Route path="/" element={<Home />} />
+          {/* Routes publiques */}
 
-          <Route path="/workout-active/:id" element={<WorkoutActive />} />
+          <Route path="/login" element={<Login />} />
 
-          <Route path="/workouts" element={<Workouts />} />
+          <Route path="/register" element={<Register />} />
 
-          <Route path="/session" element={<WorkoutSession />} />
+          {/* Routes protégées */}
 
-          <Route path="/workouts/:id" element={<WorkoutDetail />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Home />
+              </ProtectedRoute>
+            }
+          />
 
-          <Route path="/workouts/:id/edit" element={<WorkoutEdit />} />
+          <Route
+            path="/workout-active/:id"
+            element={
+              <ProtectedRoute>
+                <WorkoutActive />
+              </ProtectedRoute>
+            }
+          />
 
-          <Route path="/exercises" element={<Exercises />} />
+          <Route path="/workout-history/:id" element={<WorkoutHistory />} />
 
-          <Route path="/exercises/:id" element={<ExerciseDetail />} />
+          <Route
+            path="/workouts"
+            element={
+              <ProtectedRoute>
+                <Workouts />
+              </ProtectedRoute>
+            }
+          />
 
-          <Route path="/exercises/:id/edit" element={<ExerciseEdit />} />
+          <Route
+            path="/session"
+            element={
+              <ProtectedRoute>
+                <WorkoutSession />
+              </ProtectedRoute>
+            }
+          />
 
-          <Route path="/progress" element={<Progress />} />
+          <Route
+            path="/workouts/:id"
+            element={
+              <ProtectedRoute>
+                <WorkoutDetail />
+              </ProtectedRoute>
+            }
+          />
 
-          <Route path="/photos" element={<Photos />} />
+          <Route
+            path="/workouts/:id/edit"
+            element={
+              <ProtectedRoute>
+                <WorkoutEdit />
+              </ProtectedRoute>
+            }
+          />
 
-          <Route path="/profile" element={<Profile />} />
+          <Route
+            path="/exercises"
+            element={
+              <ProtectedRoute>
+                <Exercises />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/exercises/:id"
+            element={
+              <ProtectedRoute>
+                <ExerciseDetail />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/exercises/:id/edit"
+            element={
+              <ProtectedRoute>
+                <ExerciseEdit />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/progress"
+            element={
+              <ProtectedRoute>
+                <Progress />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/photos"
+            element={
+              <ProtectedRoute>
+                <Photos />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </MobileLayout>
     </BrowserRouter>

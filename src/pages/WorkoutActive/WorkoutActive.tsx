@@ -397,12 +397,10 @@ export default function WorkoutActive() {
       for (const set of item.sets ?? []) {
         performedSets.push({
           session_id: session.id,
-
           exercise_id: item.exercise_id,
-
           weight: Number(set.weight),
-
           reps: Number(set.reps),
+          set_number: item.sets.indexOf(set) + 1,
         });
       }
     }

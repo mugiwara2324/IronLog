@@ -66,7 +66,17 @@ export default function WorkoutDetail() {
 
   return (
     <div>
-      <button onClick={() => navigate(-1)} className="text-neutral-400">
+      <button
+        onClick={() => navigate(-1)}
+        className="
+  mb-5
+  bg-neutral-800
+  rounded-2xl
+  px-5
+  py-3
+  font-semibold
+  "
+      >
         ← Retour
       </button>
 

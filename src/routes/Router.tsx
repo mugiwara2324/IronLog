@@ -11,6 +11,7 @@ import WorkoutSession from "../pages/Workouts/WorkoutSession.tsx";
 import WorkoutEdit from "../pages/Workouts/WorkoutEdit";
 import WorkoutActive from "../pages/WorkoutActive/WorkoutActive";
 import WorkoutHistory from "../pages/WorkoutHistory/WorkoutHistory.tsx";
+import WorkoutHistoryEdit from "../pages/WorkoutHistory/WorkoutHistoryEdit";
 
 import Progress from "../pages/Progress/Progress";
 import Photos from "../pages/Photos/Photos";
@@ -57,10 +58,24 @@ export default function Router() {
           <Route path="/workout-history/:id" element={<WorkoutHistory />} />
 
           <Route
+            path="/workout-history/:id/edit"
+            element={<WorkoutHistoryEdit />}
+          />
+
+          <Route
             path="/workouts"
             element={
               <ProtectedRoute>
                 <Workouts />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/workouts/history/:id"
+            element={
+              <ProtectedRoute>
+                <WorkoutHistory />
               </ProtectedRoute>
             }
           />

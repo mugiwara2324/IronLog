@@ -23,6 +23,10 @@ export default function Home() {
 
   const [hasFinishedWorkout, setHasFinishedWorkout] = useState(false);
 
+  const [finishedSessionId, setFinishedSessionId] = useState<string | null>(
+    null,
+  );
+
   async function load() {
     try {
       const {
@@ -48,13 +52,25 @@ export default function Home() {
           .eq("user_id", user.id)
           .eq("workout_id", todayWorkout.id)
           .gte("finished_at", startOfDay.toISOString())
-          .limit(1);
+          .order("finished_at", {
+            ascending: false,
+          })
+          .limit(1)
+          .single();
 
         if (finishedError) {
           console.error("Erreur récupération séance terminée :", finishedError);
         }
 
-        setHasFinishedWorkout(!!finishedSession && finishedSession.length > 0);
+        if (finishedSession) {
+          setFinishedSessionId(finishedSession.id);
+
+          setHasFinishedWorkout(true);
+        } else {
+          setHasFinishedWorkout(false);
+
+          setFinishedSessionId(null);
+        }
       }
 
       if (!todayWorkout) {
@@ -335,7 +351,15 @@ export default function Home() {
               </button>
             ) : hasFinishedWorkout ? (
               <button
-                onClick={() => navigate(`/workout-history/${workout.id}`)}
+                onClick={() => {
+                  if (finishedSessionId) {
+                    navigate(`/workout-history/${finishedSessionId}`, {
+                      state: {
+                        from: "home",
+                      },
+                    });
+                  }
+                }}
                 className="
     mt-6
     w-full

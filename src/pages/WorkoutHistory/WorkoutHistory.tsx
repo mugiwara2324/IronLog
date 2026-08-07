@@ -1,11 +1,17 @@
 import { useEffect, useState } from "react";
 
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 
 import { supabase } from "../../lib/supabase";
 
 export default function WorkoutHistory() {
   const { id } = useParams();
+
+  const navigate = useNavigate();
+
+  const location = useLocation();
+
+  const from = location.state?.from;
 
   const [session, setSession] = useState<any>(null);
 
@@ -23,23 +29,19 @@ export default function WorkoutHistory() {
     if (!user) return;
 
     /*
-    Récupération dernière séance terminée
-    id = workout_id
-  */
+      Récupération de la séance terminée
+      id = workout_sessions.id
+    */
 
     const { data: workoutSession, error } = await supabase
       .from("workout_sessions")
       .select("*")
-      .eq("workout_id", id)
+      .eq("id", id)
       .eq("user_id", user.id)
-      .order("finished_at", {
-        ascending: false,
-      })
-      .limit(1)
       .single();
 
     if (error) {
-      console.error("Erreur récupération historique :", error);
+      console.error("Erreur récupération séance historique :", error);
 
       return;
     }
@@ -47,19 +49,21 @@ export default function WorkoutHistory() {
     setSession(workoutSession);
 
     /*
-    Récupération séries réalisées
-  */
+      Récupération des séries réalisées
+
+      On essaye d'abord avec session_id
+    */
 
     const { data: performedSets, error: setsError } = await supabase
       .from("performed_sets")
       .select(
         `
-        *,
-        exercises(
-          id,
-          name
-        )
-      `,
+          *,
+          exercises(
+            id,
+            name
+          )
+          `,
       )
       .eq("session_id", workoutSession.id);
 
@@ -70,8 +74,8 @@ export default function WorkoutHistory() {
     }
 
     /*
-    Regroupement des séries par exercice
-  */
+      Regroupement par exercice
+    */
 
     const groupedExercises: any = {};
 
@@ -102,11 +106,40 @@ export default function WorkoutHistory() {
     return <div>Chargement...</div>;
   }
 
+  function isToday(date: string) {
+    const d = new Date(date);
+
+    const today = new Date();
+
+    return (
+      d.getFullYear() === today.getFullYear() &&
+      d.getMonth() === today.getMonth() &&
+      d.getDate() === today.getDate()
+    );
+  }
+
   return (
     <div>
+      <button
+        onClick={() => {
+          if (from === "home") {
+            navigate("/");
+          } else {
+            navigate("/workouts?tab=history");
+          }
+        }}
+        className="
+  mb-5
+  bg-neutral-800
+  rounded-2xl
+  px-5
+  py-3
+  font-semibold
+  "
+      >
+        ← Retour
+      </button>
       <h1 className="text-3xl font-bold">Séance terminée</h1>
-
-      {/* Résumé séance */}
 
       <div
         className="
@@ -127,85 +160,114 @@ export default function WorkoutHistory() {
         <p className="text-neutral-400 mt-2">
           {new Date(session.finished_at).toLocaleString()}
         </p>
+
+        {/* 
+          Modification autorisée uniquement
+          depuis une vraie séance du jour
+          sera gérée ailleurs.
+          
+          Ici historique = toujours modifiable
+        */}
+
+        {isToday(session.finished_at) && (
+          <button
+            onClick={() => navigate(`/workout-history/${session.id}/edit`)}
+            className="
+      mt-5
+      bg-blue-600
+      rounded-2xl
+      px-5
+      py-3
+      font-bold
+      "
+          >
+            Modifier la séance
+          </button>
+        )}
       </div>
 
-      {/* Exercices */}
+      <div
+        className="
+        mt-6
+        space-y-4
+        "
+      >
+        {exercises.length === 0 ? (
+          <p className="text-neutral-400">
+            Aucun détail d'exercice disponible.
+          </p>
+        ) : (
+          exercises.map((exercise) => {
+            const isOpen = openExercise === exercise.id;
 
-      <div className="mt-6 space-y-4">
-        {exercises.map((exercise) => {
-          const isOpen = openExercise === exercise.id;
+            const bestWeight = Math.max(
+              ...exercise.sets.map((set: any) => Number(set.weight)),
+            );
 
-          const bestWeight = Math.max(
-            ...exercise.sets.map((set: any) => Number(set.weight)),
-          );
-
-          return (
-            <div
-              key={exercise.id}
-              className="
-              bg-neutral-900
-              rounded-3xl
-              p-5
-              cursor-pointer
-              "
-              onClick={() => setOpenExercise(isOpen ? null : exercise.id)}
-            >
-              {/* Header exercice */}
-
+            return (
               <div
+                key={exercise.id}
                 className="
-                flex
-                justify-between
-                items-center
-                "
+                  bg-neutral-900
+                  rounded-3xl
+                  p-5
+                  cursor-pointer
+                  "
+                onClick={() => setOpenExercise(isOpen ? null : exercise.id)}
               >
-                <div>
-                  <h2 className="text-xl font-bold">{exercise.name}</h2>
-
-                  <p className="text-neutral-400 mt-1">
-                    {exercise.sets.length} séries
-                  </p>
-                </div>
-
-                <div className="text-right">
-                  <p className="font-bold text-lg">{bestWeight} kg</p>
-
-                  <p className="text-neutral-400 text-sm">meilleur poids</p>
-                </div>
-              </div>
-
-              {/* Détail séries */}
-
-              {isOpen && (
                 <div
                   className="
-                  mt-5
-                  space-y-3
-                  "
+                    flex
+                    justify-between
+                    items-center
+                    "
                 >
-                  {exercise.sets.map((set: any, index: number) => (
-                    <div
-                      key={index}
-                      className="
-                      bg-neutral-800
-                      rounded-2xl
-                      p-4
-                      flex
-                      justify-between
-                      "
-                    >
-                      <span>Série {index + 1}</span>
+                  <div>
+                    <h2 className="text-xl font-bold">{exercise.name}</h2>
 
-                      <span className="font-semibold">
-                        {set.weight} kg × {set.reps}
-                      </span>
-                    </div>
-                  ))}
+                    <p className="text-neutral-400 mt-1">
+                      {exercise.sets.length} séries
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="font-bold text-lg">{bestWeight} kg</p>
+
+                    <p className="text-neutral-400 text-sm">meilleur poids</p>
+                  </div>
                 </div>
-              )}
-            </div>
-          );
-        })}
+
+                {isOpen && (
+                  <div
+                    className="
+                        mt-5
+                        space-y-3
+                        "
+                  >
+                    {exercise.sets.map((set: any, index: number) => (
+                      <div
+                        key={index}
+                        className="
+                                bg-neutral-800
+                                rounded-2xl
+                                p-4
+                                flex
+                                justify-between
+                                "
+                      >
+                        <span>Série {index + 1}</span>
+
+                        <span className="font-semibold">
+                          {set.weight} kg × {set.reps}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

@@ -178,8 +178,13 @@ export default function WorkoutEdit() {
       <button
         onClick={() => navigate(-1)}
         className="
-        text-neutral-400
-        "
+  mb-5
+  bg-neutral-800
+  rounded-2xl
+  px-5
+  py-3
+  font-semibold
+  "
       >
         ← Retour
       </button>

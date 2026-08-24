@@ -19,6 +19,7 @@ export async function getWorkoutDetails(workoutId: string) {
         sets,
         reps,
         weight,
+        order,
         order_index,
         exercises(
           id,
@@ -38,7 +39,9 @@ export async function getWorkoutDetails(workoutId: string) {
   }
 
   data.workout_exercises.sort(
-    (a: any, b: any) => a.order_index - b.order_index,
+    (a: any, b: any) =>
+      Number(a.order ?? a.order_index ?? 0) -
+      Number(b.order ?? b.order_index ?? 0),
   );
 
   return data;

@@ -28,7 +28,10 @@ export default function WorkoutDetail() {
         setWorkout(workoutData);
 
         const sortedExercises = [...(workoutData.workout_exercises ?? [])]
-          .sort((a, b) => a.order_index - b.order_index)
+          .sort((a, b) =>
+            Number(a.order ?? a.order_index ?? 0) -
+            Number(b.order ?? b.order_index ?? 0),
+          )
           .map((item) => ({
             ...item,
             exercise: item.exercises,
@@ -96,7 +99,7 @@ export default function WorkoutDetail() {
         mt-2
         "
       >
-        {workout.day}
+        Jour de référence : {getDayName(workout.day_of_week)}
       </p>
 
       <p className="mt-2">{workout.description}</p>
@@ -194,4 +197,8 @@ export default function WorkoutDetail() {
       </button>
     </div>
   );
+}
+
+function getDayName(day: number) {
+  return ["", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"][day] ?? "";
 }

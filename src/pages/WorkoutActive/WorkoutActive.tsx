@@ -218,6 +218,7 @@ export default function WorkoutActive() {
       .from("records")
       .select("*")
       .eq("exercise_id", item.exercise_id)
+      .eq("user_id", user.id)
       .limit(1);
 
     const record = recordData && recordData.length > 0 ? recordData[0] : null;

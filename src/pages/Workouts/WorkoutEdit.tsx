@@ -17,6 +17,10 @@ export default function WorkoutEdit() {
 
   const [showAdd, setShowAdd] = useState(false);
 
+  const [saving, setSaving] = useState(false);
+
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   async function load() {
     if (!id) return;
 
@@ -35,8 +39,9 @@ export default function WorkoutEdit() {
 
     const sortedData = (data ?? [])
       .slice()
-      .sort(
-        (a: any, b: any) => (Number(a.order) || 0) - (Number(b.order) || 0),
+      .sort((a: any, b: any) =>
+        Number(a.order ?? a.order_index ?? 0) -
+        Number(b.order ?? b.order_index ?? 0),
       );
 
     const full = await Promise.all(
@@ -82,18 +87,30 @@ export default function WorkoutEdit() {
       return;
     }
 
-    await supabase
+    setErrorMessage(null);
+
+    const { error: deleteError } = await supabase
       .from("workout_exercises")
       .delete()
       .eq("id", workoutExerciseId);
 
+    if (deleteError) {
+      setErrorMessage("Impossible de supprimer cet exercice.");
+      return;
+    }
+
     const remaining = exercises.filter((item) => item.id !== workoutExerciseId);
 
-    for (let i = 0; i < remaining.length; i++) {
-      await supabase
+    const results = await Promise.all(remaining.map((item, position) =>
+      supabase
         .from("workout_exercises")
-        .update({ order: i })
-        .eq("id", remaining[i].id);
+        .update({ order: position, order_index: position })
+        .eq("id", item.id),
+    ));
+
+    if (results.some((result) => result.error)) {
+      setErrorMessage("L'exercice a été supprimé, mais l'ordre n'a pas pu être enregistré.");
+      return;
     }
 
     load();
@@ -112,7 +129,7 @@ export default function WorkoutEdit() {
     );
   }
 
-  async function moveExercise(index: number, direction: number) {
+  function moveExercise(index: number, direction: number) {
     const newExercises = [...exercises];
 
     const target = index + direction;
@@ -126,51 +143,56 @@ export default function WorkoutEdit() {
       newExercises[index],
     ];
 
-    for (let i = 0; i < newExercises.length; i++) {
-      await supabase
-        .from("workout_exercises")
-        .update({ order: i })
-        .eq("id", newExercises[i].id);
-
-      newExercises[i].order = i;
-    }
-
-    setExercises(newExercises);
+    setExercises(newExercises.map((exercise, position) => ({
+      ...exercise,
+      order: position,
+      order_index: position,
+    })));
   }
 
   async function save() {
-    for (const item of exercises) {
-      const { data: oldData } = await supabase
+    setSaving(true);
+    setErrorMessage(null);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Utilisateur non authentifié");
+
+      const { data: savedExercises, error: readError } = await supabase
         .from("workout_exercises")
-        .select("*")
-        .eq("id", item.id)
-        .limit(1);
+        .select("id, exercise_id, weight")
+        .eq("workout_id", id);
 
-      const old = oldData && oldData[0] ? oldData[0] : null;
+      if (readError) throw readError;
+      const savedById = new Map((savedExercises ?? []).map((item) => [item.id, item]));
 
-      if (!old) continue;
+      await Promise.all(exercises.map(async (item, position) => {
+        const old = savedById.get(item.id);
+        const { error } = await supabase
+          .from("workout_exercises")
+          .update({ sets: Number(item.sets), reps: item.reps, weight: Number(item.weight), order: position, order_index: position })
+          .eq("id", item.id);
+        if (error) throw error;
 
-      if (old.weight !== item.weight) {
-        await supabase.from("weight_history").insert({
-          exercise_id: item.exercise.id,
-          old_weight: old.weight,
-          new_weight: item.weight,
-          date: new Date().toISOString(),
-        });
-      }
+        if (old && Number(old.weight) !== Number(item.weight)) {
+          const { error: historyError } = await supabase.from("weight_history").insert({
+            user_id: user.id,
+            exercise_id: old.exercise_id,
+            old_weight: old.weight,
+            new_weight: Number(item.weight),
+            date: new Date().toISOString(),
+          });
+          if (historyError) throw historyError;
+        }
+      }));
 
-      await supabase
-        .from("workout_exercises")
-        .update({
-          sets: item.sets,
-          reps: item.reps,
-          weight: item.weight,
-          order: item.order,
-        })
-        .eq("id", item.id);
+      navigate(-1);
+    } catch (error: unknown) {
+      console.error("Erreur sauvegarde séance :", error);
+      setErrorMessage(error instanceof Error ? error.message : "La séance n'a pas pu être enregistrée.");
+    } finally {
+      setSaving(false);
     }
-
-    navigate(-1);
   }
 
   return (
@@ -330,6 +352,7 @@ export default function WorkoutEdit() {
 
       <button
         onClick={save}
+        disabled={saving}
         className="
         mt-8
         w-full
@@ -340,8 +363,10 @@ export default function WorkoutEdit() {
         font-semibold
         "
       >
-        Enregistrer les modifications
+        {saving ? "Enregistrement..." : "Enregistrer les modifications"}
       </button>
+
+      {errorMessage && <p className="mt-4 text-red-400">{errorMessage}</p>}
 
       {showAdd && (
         <ExerciseFormModal

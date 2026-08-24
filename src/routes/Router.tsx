@@ -23,6 +23,7 @@ import ExerciseEdit from "../pages/Exercises/ExerciseEdit";
 
 import Login from "../auth/Login";
 import Register from "../auth/Register";
+import ResetPassword from "../auth/ResetPassword";
 
 export default function Router() {
   return (
@@ -34,6 +35,8 @@ export default function Router() {
           <Route path="/login" element={<Login />} />
 
           <Route path="/register" element={<Register />} />
+
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* Routes protégées */}
 

@@ -13,7 +13,12 @@ export default function Login() {
 
   const [error, setError] = useState("");
 
+  const [loading, setLoading] = useState(false);
+
   async function login() {
+    setLoading(true);
+    setError("");
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
 
@@ -22,10 +27,11 @@ export default function Login() {
 
     if (error) {
       setError(error.message);
-
+      setLoading(false);
       return;
     }
 
+    setLoading(false);
     navigate("/");
   }
 
@@ -82,6 +88,7 @@ export default function Login() {
 
         <button
           onClick={login}
+          disabled={loading}
           className="
           mt-6
           w-full
@@ -91,13 +98,20 @@ export default function Login() {
           py-4
           "
         >
-          Se connecter
+          {loading ? "Connexion..." : "Se connecter"}
+        </button>
+
+        <button
+          onClick={() => navigate("/reset-password")}
+          className="mt-4 text-neutral-400 w-full"
+        >
+          Mot de passe oublié ?
         </button>
 
         <button
           onClick={() => navigate("/register")}
           className="
-          mt-4
+          mt-3
           text-neutral-400
           w-full
           "

@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { supabase } from "../../lib/supabase";
+import useBodyScrollLock from "../../hooks/useBodyScrollLock";
 
 interface Props {
   onClose: () => void;
@@ -14,6 +15,8 @@ export default function AddProgressPhoto({ onClose, onSave }: Props) {
   const [category, setCategory] = useState<"front" | "side" | "back">("front");
 
   const [note, setNote] = useState("");
+
+  useBodyScrollLock(true);
 
   function compressImage(file: File): Promise<string> {
     return new Promise((resolve) => {
@@ -96,27 +99,13 @@ export default function AddProgressPhoto({ onClose, onSave }: Props) {
 
   return (
     <div
-      className="
-    fixed
-    inset-0
-    bg-black/70
-    flex
-    items-center
-    justify-center
-    p-4
-    "
+      className="modal-overlay"
     >
       <div
-        className="
-      bg-neutral-900
-      rounded-3xl
-      p-6
-      w-full
-      max-w-md
-      max-h-[85vh]
-      overflow-y-auto
-      translate-y-[-3%]
-      "
+        className="modal-panel bg-neutral-900 rounded-3xl p-6 w-full max-w-md"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="progress-photo-title"
       >
         <button
           onClick={onClose}
@@ -128,6 +117,7 @@ export default function AddProgressPhoto({ onClose, onSave }: Props) {
         </button>
 
         <h2
+          id="progress-photo-title"
           className="
         text-2xl
         font-bold
@@ -137,13 +127,12 @@ export default function AddProgressPhoto({ onClose, onSave }: Props) {
           Nouvelle photo
         </h2>
 
+        <label className="field-label mt-6" htmlFor="progress-photo-file">Photo à ajouter</label>
         <input
+          id="progress-photo-file"
           type="file"
           accept="image/*"
           onChange={handleImage}
-          className="
-        mt-6
-        "
         />
 
         {image && (
@@ -157,20 +146,10 @@ export default function AddProgressPhoto({ onClose, onSave }: Props) {
           />
         )}
 
-        <div
-          className="
-        mt-6
-        "
-        >
-          <p
-            className="
-          text-neutral-400
-          "
-          >
-            Position
-          </p>
-
+        <div className="mt-6">
+          <label className="field-label" htmlFor="progress-photo-position">Position</label>
           <select
+            id="progress-photo-position"
             value={category}
             onChange={(e) => setCategory(e.target.value as any)}
             className="
@@ -189,12 +168,13 @@ export default function AddProgressPhoto({ onClose, onSave }: Props) {
           </select>
         </div>
 
+        <label className="field-label mt-6" htmlFor="progress-photo-note">Note</label>
         <textarea
+          id="progress-photo-note"
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="Note..."
+          placeholder="Ajouter une note"
           className="
-        mt-6
         w-full
         bg-neutral-800
         rounded-xl

@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { supabase } from "../../lib/supabase";
+import useBodyScrollLock from "../../hooks/useBodyScrollLock";
 
 interface Props {
   item: any;
@@ -23,6 +24,8 @@ export default function WorkoutExerciseEditor({
   );
 
   const [comment, setComment] = useState(item.comment ?? "");
+
+  useBodyScrollLock(true);
 
   function updateSet(index: number, field: "weight" | "reps", value: string) {
     const newSets = [...sets];
@@ -91,30 +94,15 @@ export default function WorkoutExerciseEditor({
 
   return (
     <div
-      className="
-      fixed
-      inset-0
-      bg-black/70
-      flex
-      items-center
-      justify-center
-      p-5
-      overflow-hidden
-      z-50
-      "
+      className="modal-overlay"
     >
       <div
-        className="
-        bg-neutral-900
-        rounded-3xl
-        p-6
-        w-full
-        max-w-md
-        max-h-[85vh]
-        overflow-y-auto
-        "
+        className="modal-panel bg-neutral-900 rounded-3xl p-6 w-full max-w-md"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="workout-exercise-title"
       >
-        <h2 className="text-xl font-bold">{item.exercise?.name}</h2>
+        <h2 id="workout-exercise-title" className="text-xl font-bold">{item.exercise?.name}</h2>
 
         <p className="text-neutral-400 mt-2">
           {item.exercise?.muscles?.join(" • ")}
@@ -134,9 +122,9 @@ export default function WorkoutExerciseEditor({
 
               <div className="flex gap-3">
                 <div className="w-1/2">
-                  <p className="text-xs text-neutral-400 mb-1">Poids (kg)</p>
-
+                  <label className="field-label" htmlFor={`set-weight-${index}`}>Poids (kg)</label>
                   <input
+                    id={`set-weight-${index}`}
                     type="number"
                     value={set.weight}
                     onChange={(e) => updateSet(index, "weight", e.target.value)}
@@ -150,9 +138,9 @@ export default function WorkoutExerciseEditor({
                 </div>
 
                 <div className="w-1/2">
-                  <p className="text-xs text-neutral-400 mb-1">Répétitions</p>
-
+                  <label className="field-label" htmlFor={`set-reps-${index}`}>Répétitions</label>
                   <input
+                    id={`set-reps-${index}`}
                     type="number"
                     value={set.reps}
                     onChange={(e) => updateSet(index, "reps", e.target.value)}
@@ -168,10 +156,12 @@ export default function WorkoutExerciseEditor({
             </div>
           ))}
 
+          <label className="field-label" htmlFor="exercise-comment">Commentaire sur l’exercice</label>
           <textarea
+            id="exercise-comment"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="Commentaire sur l'exercice..."
+            placeholder="Ajouter un commentaire"
             className="
             mt-4
             w-full

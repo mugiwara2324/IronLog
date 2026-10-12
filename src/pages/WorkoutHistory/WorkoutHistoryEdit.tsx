@@ -184,43 +184,37 @@ export default function WorkoutHistoryEdit() {
                 mt-4
               "
             >
-              <input
-                type="number"
-                value={set.weight}
-                onChange={(e) => updateSet(index, "weight", e.target.value)}
-                className="
+              <label className="block w-full">
+                <span className="field-label">Poids (kg)</span>
+                <input
+                  id={`history-weight-${set.id}`}
+                  type="number"
+                  value={set.weight}
+                  onChange={(e) => updateSet(index, "weight", e.target.value)}
+                  className="
                   bg-neutral-800
                   rounded-xl
                   p-3
                   w-full
                   "
-              />
+                />
+              </label>
 
-              <input
-                type="number"
-                value={set.reps}
-                onChange={(e) => updateSet(index, "reps", e.target.value)}
-                className="
+              <label className="block w-full">
+                <span className="field-label">Répétitions</span>
+                <input
+                  id={`history-reps-${set.id}`}
+                  type="number"
+                  value={set.reps}
+                  onChange={(e) => updateSet(index, "reps", e.target.value)}
+                  className="
                   bg-neutral-800
                   rounded-xl
                   p-3
                   w-full
                   "
-              />
-            </div>
-
-            <div
-              className="
-                flex
-                gap-2
-                mt-2
-                text-neutral-400
-                text-sm
-              "
-            >
-              <span>kg</span>
-
-              <span>répétitions</span>
+                />
+              </label>
             </div>
           </div>
         ))}

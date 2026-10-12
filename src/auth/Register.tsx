@@ -99,43 +99,55 @@ export default function Register() {
           space-y-4
           "
         >
-          <input
-            placeholder="Nom"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="
+          <div>
+            <label className="field-label" htmlFor="register-name">Nom</label>
+            <input
+              id="register-name"
+              autoComplete="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="
             w-full
             bg-neutral-800
             rounded-xl
             p-3
             "
-          />
+            />
+          </div>
 
-          <input
-            placeholder="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="
+          <div>
+            <label className="field-label" htmlFor="register-email">Adresse e-mail</label>
+            <input
+              id="register-email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="
             w-full
             bg-neutral-800
             rounded-xl
             p-3
             "
-          />
+            />
+          </div>
 
-          <input
-            placeholder="Mot de passe"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="
+          <div>
+            <label className="field-label" htmlFor="register-password">Mot de passe</label>
+            <input
+              id="register-password"
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="
             w-full
             bg-neutral-800
             rounded-xl
             p-3
             "
-          />
+            />
+          </div>
         </div>
 
         {error && <p className="text-red-400 mt-4">{error}</p>}

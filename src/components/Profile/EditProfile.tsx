@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/AuthProvider";
 import { deleteAccount, updateProfile } from "../../services/profileService";
+import useBodyScrollLock from "../../hooks/useBodyScrollLock";
 
 interface Props {
   profile: any;
@@ -57,6 +58,8 @@ export default function EditProfile({
   const { signOut } = useAuth();
 
   const { clearLocalSession } = useAuth();
+
+  useBodyScrollLock(true);
 
   async function save() {
     await updateProfile({
@@ -116,138 +119,108 @@ export default function EditProfile({
 
   return (
     <div
-      className="
-      fixed
-      inset-0
-      bg-black/70
-      flex
-      items-center
-      justify-center
-      p-4
-      "
+      className="modal-overlay"
     >
       <div
-        className="
-        bg-neutral-900
-        rounded-3xl
-        p-6
-        w-full
-        max-w-md
-        "
+        className="modal-panel bg-neutral-900 rounded-3xl p-6 w-full max-w-md"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-profile-title"
       >
-        <h2
-          className="
-          text-2xl
-          font-bold
-          "
-        >
+        <h2 id="edit-profile-title" className="text-2xl font-bold">
           Modifier profil
         </h2>
 
-        <input
-          placeholder="Nom"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="
-          mt-6
-          w-full
-          bg-neutral-800
-          rounded-xl
-          p-3
-          "
-        />
-
-        <input
-          type="number"
-          placeholder="Âge"
-          value={age}
-          onChange={(e) => setAge(e.target.value)}
-          className="
-          mt-3
-          w-full
-          bg-neutral-800
-          rounded-xl
-          p-3
-          "
-        />
-
-        <input
-          type="number"
-          placeholder="Taille (cm)"
-          value={height}
-          onChange={(e) => setHeight(e.target.value)}
-          className="
-          mt-3
-          w-full
-          bg-neutral-800
-          rounded-xl
-          p-3
-          "
-        />
-
-        <select
-          value={goal}
-          onChange={(e) => setGoal(e.target.value)}
-          className="
-          mt-3
-          w-full
-          bg-neutral-800
-          rounded-xl
-          p-3
-          "
-        >
-          <option value="">Objectif</option>
-
-          <option value="Perte de gras">Perte de gras</option>
-
-          <option value="Prise de muscle">Prise de muscle</option>
-
-          <option value="Force">Force</option>
-
-          <option value="Basket">Performance basket</option>
-        </select>
-
-        <input
-          type="number"
-          placeholder="Poids objectif (kg)"
-          value={targetWeight}
-          onChange={(e) => setTargetWeight(e.target.value)}
-          className="
-          mt-3
-          w-full
-          bg-neutral-800
-          rounded-xl
-          p-3
-          "
-        />
-
-        <input
-          type="number"
-          placeholder="Masse grasse objectif (%)"
-          value={targetBodyFat}
-          onChange={(e) => setTargetBodyFat(e.target.value)}
-          className="
-          mt-3
-          w-full
-          bg-neutral-800
-          rounded-xl
-          p-3
-          "
-        />
-
-        <input
-          type="number"
-          placeholder="Masse musculaire objectif (%)"
-          value={targetMuscleMass}
-          onChange={(e) => setTargetMuscleMass(e.target.value)}
-          className="
-          mt-3
-          w-full
-          bg-neutral-800
-          rounded-xl
-          p-3
-          "
-        />
+        <div className="mt-6 space-y-4">
+          <div>
+            <label className="field-label" htmlFor="profile-name">
+              Nom
+            </label>
+            <input
+              id="profile-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full bg-neutral-800 rounded-xl p-3"
+            />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="profile-age">
+              Âge (ans)
+            </label>
+            <input
+              id="profile-age"
+              type="number"
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              className="w-full bg-neutral-800 rounded-xl p-3"
+            />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="profile-height">
+              Taille (cm)
+            </label>
+            <input
+              id="profile-height"
+              type="number"
+              value={height}
+              onChange={(e) => setHeight(e.target.value)}
+              className="w-full bg-neutral-800 rounded-xl p-3"
+            />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="profile-goal">
+              Objectif sportif
+            </label>
+            <select
+              id="profile-goal"
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
+              className="w-full bg-neutral-800 rounded-xl p-3"
+            >
+              <option value="">Choisir un objectif</option>
+              <option value="Perte de gras">Perte de gras</option>
+              <option value="Prise de muscle">Prise de muscle</option>
+              <option value="Force">Force</option>
+              <option value="Basket">Performance basket</option>
+            </select>
+          </div>
+          <div>
+            <label className="field-label" htmlFor="profile-target-weight">
+              Poids cible (kg)
+            </label>
+            <input
+              id="profile-target-weight"
+              type="number"
+              value={targetWeight}
+              onChange={(e) => setTargetWeight(e.target.value)}
+              className="w-full bg-neutral-800 rounded-xl p-3"
+            />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="profile-target-fat">
+              Masse grasse cible (%)
+            </label>
+            <input
+              id="profile-target-fat"
+              type="number"
+              value={targetBodyFat}
+              onChange={(e) => setTargetBodyFat(e.target.value)}
+              className="w-full bg-neutral-800 rounded-xl p-3"
+            />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="profile-target-muscle">
+              Masse musculaire cible (%)
+            </label>
+            <input
+              id="profile-target-muscle"
+              type="number"
+              value={targetMuscleMass}
+              onChange={(e) => setTargetMuscleMass(e.target.value)}
+              className="w-full bg-neutral-800 rounded-xl p-3"
+            />
+          </div>
+        </div>
 
         <button
           onClick={save}

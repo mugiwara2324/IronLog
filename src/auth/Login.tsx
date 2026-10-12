@@ -52,31 +52,39 @@ export default function Login() {
         <h1 className="text-3xl font-bold">Connexion</h1>
 
         <div className="mt-6 space-y-4">
-          <input
-            placeholder="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="
+          <div>
+            <label className="field-label" htmlFor="login-email">Adresse e-mail</label>
+            <input
+              id="login-email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="
             w-full
             bg-neutral-800
             rounded-xl
             p-3
             "
-          />
+            />
+          </div>
 
-          <input
-            placeholder="Mot de passe"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="
+          <div>
+            <label className="field-label" htmlFor="login-password">Mot de passe</label>
+            <input
+              id="login-password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="
             w-full
             bg-neutral-800
             rounded-xl
             p-3
             "
-          />
+            />
+          </div>
         </div>
 
         {error && <p className="text-red-400 mt-4">{error}</p>}

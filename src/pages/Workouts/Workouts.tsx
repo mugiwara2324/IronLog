@@ -200,38 +200,42 @@ export default function Workouts() {
               space-y-4
               "
               >
-                <input
-                  value={newWorkout.name}
-                  onChange={(e) =>
-                    setNewWorkout((prev) => ({
-                      ...prev,
-                      name: e.target.value,
-                    }))
-                  }
-                  placeholder="Nom de la séance"
-                  className="
+                <label>
+                  <span className="field-label">Nom de la séance</span>
+                  <input
+                    value={newWorkout.name}
+                    onChange={(e) =>
+                      setNewWorkout((prev) => ({
+                        ...prev,
+                        name: e.target.value,
+                      }))
+                    }
+                    className="
                 w-full
                 rounded-xl
                 p-3
                 bg-neutral-800
                 "
-                />
+                  />
+                </label>
 
-                <select
-                  value={newWorkout.day_of_week}
-                  onChange={(e) =>
-                    setNewWorkout((prev) => ({
-                      ...prev,
-                      day_of_week: Number(e.target.value),
-                    }))
-                  }
-                  className="
+                <label>
+                  <span className="field-label">Jour de la séance</span>
+                  <select
+                    value={newWorkout.day_of_week}
+                    onChange={(e) =>
+                      setNewWorkout((prev) => ({
+                        ...prev,
+                        day_of_week: Number(e.target.value),
+                      }))
+                    }
+                    className="
                 w-full
                 rounded-xl
                 p-3
                 bg-neutral-800
                 "
-                >
+                  >
                   <option value={1}>Lundi</option>
                   <option value={2}>Mardi</option>
                   <option value={3}>Mercredi</option>
@@ -239,25 +243,28 @@ export default function Workouts() {
                   <option value={5}>Vendredi</option>
                   <option value={6}>Samedi</option>
                   <option value={7}>Dimanche</option>
-                </select>
+                  </select>
+                </label>
 
-                <textarea
-                  value={newWorkout.description}
-                  onChange={(e) =>
-                    setNewWorkout((prev) => ({
-                      ...prev,
-                      description: e.target.value,
-                    }))
-                  }
-                  placeholder="Description"
-                  className="
+                <label>
+                  <span className="field-label">Description</span>
+                  <textarea
+                    value={newWorkout.description}
+                    onChange={(e) =>
+                      setNewWorkout((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
+                    className="
                 w-full
                 rounded-xl
                 p-3
                 bg-neutral-800
                 min-h-[120px]
                 "
-                />
+                  />
+                </label>
 
                 <div className="flex gap-3">
                   <button

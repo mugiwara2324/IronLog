@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { supabase } from "../../lib/supabase";
+import useBodyScrollLock from "../../hooks/useBodyScrollLock";
 
 interface Props {
   mode: "create" | "edit";
@@ -62,6 +63,8 @@ export default function ExerciseFormModal({
   const [results, setResults] = useState<any[]>([]);
 
   const [selectedExercise, setSelectedExercise] = useState<any>(null);
+
+  useBodyScrollLock(true);
 
   /*
     Recherche automatique
@@ -215,36 +218,24 @@ export default function ExerciseFormModal({
 
   return (
     <div
-      className="
-      fixed
-      inset-0
-      bg-black/70
-      flex
-      items-center
-      justify-center
-      p-5
-      z-50
-      "
+      className="modal-overlay"
     >
       <div
-        className="
-        bg-neutral-900
-        rounded-3xl
-        p-6
-        w-full
-        max-w-md
-        max-h-[90vh]
-        overflow-y-auto
-        "
+        className="modal-panel bg-neutral-900 rounded-3xl p-6 w-full max-w-md"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="exercise-form-title"
       >
-        <h2 className="text-2xl font-bold">
+        <h2 id="exercise-form-title" className="text-2xl font-bold">
           {mode === "create" ? "Nouvel exercice" : "Modifier l'exercice"}
         </h2>
 
         <div className="mt-6 space-y-4">
           <div className="relative">
+            <label className="field-label" htmlFor="exercise-search">Nom de l’exercice</label>
             <input
-              placeholder="Rechercher un exercice..."
+              id="exercise-search"
+              placeholder="Rechercher dans les exercices"
               value={name}
               onChange={(e) => {
                 setSelectedExercise(null);
@@ -297,7 +288,9 @@ export default function ExerciseFormModal({
             </p>
           )}
 
+          <label className="field-label" htmlFor="exercise-description">Description</label>
           <textarea
+            id="exercise-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Description"
@@ -335,7 +328,9 @@ export default function ExerciseFormModal({
             </div>
           </div>
 
+          <label className="field-label" htmlFor="exercise-sets">Nombre de séries</label>
           <input
+            id="exercise-sets"
             type="number"
             value={sets}
             onChange={(e) => setSets(Number(e.target.value))}
@@ -348,7 +343,9 @@ export default function ExerciseFormModal({
             "
           />
 
+          <label className="field-label" htmlFor="exercise-reps">Répétitions par série</label>
           <input
+            id="exercise-reps"
             value={reps}
             onChange={(e) => setReps(e.target.value)}
             placeholder="Répétitions"
@@ -360,7 +357,9 @@ export default function ExerciseFormModal({
             "
           />
 
+          <label className="field-label" htmlFor="exercise-weight">Charge initiale (kg)</label>
           <input
+            id="exercise-weight"
             type="number"
             value={weight}
             onChange={(e) => setWeight(Number(e.target.value))}
@@ -373,7 +372,9 @@ export default function ExerciseFormModal({
             "
           />
 
+          <label className="field-label" htmlFor="exercise-notes">Notes</label>
           <textarea
+            id="exercise-notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Notes"

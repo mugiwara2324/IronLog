@@ -104,6 +104,44 @@ input[type="checkbox"] {
   min-height: 100vh;
 }
 
+.modal-overlay {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: max(1rem, env(safe-area-inset-top, 0px))
+    max(1rem, env(safe-area-inset-right, 0px))
+    max(1rem, env(safe-area-inset-bottom, 0px))
+    max(1rem, env(safe-area-inset-left, 0px));
+  background: rgba(0, 0, 0, 0.72);
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-panel {
+  max-height: calc(
+    100vh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+  max-height: calc(
+    100dvh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+  margin: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 560;
+}
+
 .app-shell {
   min-height: 100vh;
   color: #f5f6f7;

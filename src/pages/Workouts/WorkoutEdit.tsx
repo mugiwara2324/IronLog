@@ -107,13 +107,6 @@ export default function WorkoutEdit() {
     void load();
   }, [load]);
 
-  useEffect(() => {
-    document.body.style.overflow = showAdd ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [showAdd]);
-
   async function deleteExercise(workoutExerciseId: string | number) {
     const confirmed = window.confirm("Retirer cet exercice de la séance ?");
     if (!confirmed) return;

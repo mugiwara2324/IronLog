@@ -120,9 +120,10 @@ export default function ExerciseEdit() {
             "
       >
         <div>
-          <label>Séries</label>
+          <label className="field-label" htmlFor="edit-exercise-sets">Séries</label>
 
           <input
+            id="edit-exercise-sets"
             type="number"
             value={sets}
             onChange={(e) => setSets(Number(e.target.value))}
@@ -136,9 +137,10 @@ export default function ExerciseEdit() {
         </div>
 
         <div>
-          <label>Répétitions</label>
+          <label className="field-label" htmlFor="edit-exercise-reps">Répétitions</label>
 
           <input
+            id="edit-exercise-reps"
             value={reps}
             onChange={(e) => setReps(e.target.value)}
             className="
@@ -151,9 +153,10 @@ export default function ExerciseEdit() {
         </div>
 
         <div>
-          <label>Charge (kg)</label>
+          <label className="field-label" htmlFor="edit-exercise-weight">Charge (kg)</label>
 
           <input
+            id="edit-exercise-weight"
             type="number"
             value={weight}
             onChange={(e) => setWeight(Number(e.target.value))}

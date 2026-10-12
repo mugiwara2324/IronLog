@@ -78,20 +78,28 @@ export default function ResetPassword() {
         {recoveryMode ? (
           <div className="mt-6 space-y-4">
             <p className="text-neutral-400">Choisis un nouveau mot de passe pour ton compte.</p>
-            <input
-              placeholder="Nouveau mot de passe"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="w-full bg-neutral-800 rounded-xl p-3"
-            />
-            <input
-              placeholder="Confirmer le mot de passe"
-              type="password"
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              className="w-full bg-neutral-800 rounded-xl p-3"
-            />
+            <div>
+              <label className="field-label" htmlFor="new-password">Nouveau mot de passe</label>
+              <input
+                id="new-password"
+                type="password"
+                autoComplete="new-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="w-full bg-neutral-800 rounded-xl p-3"
+              />
+            </div>
+            <div>
+              <label className="field-label" htmlFor="confirm-password">Confirmer le mot de passe</label>
+              <input
+                id="confirm-password"
+                type="password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                className="w-full bg-neutral-800 rounded-xl p-3"
+              />
+            </div>
             <button
               onClick={updatePassword}
               disabled={loading}
@@ -103,13 +111,17 @@ export default function ResetPassword() {
         ) : (
           <div className="mt-6 space-y-4">
             <p className="text-neutral-400">Indique l&apos;adresse e-mail utilisée pour créer ton compte.</p>
-            <input
-              placeholder="Email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="w-full bg-neutral-800 rounded-xl p-3"
-            />
+            <div>
+              <label className="field-label" htmlFor="recovery-email">Adresse e-mail</label>
+              <input
+                id="recovery-email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="w-full bg-neutral-800 rounded-xl p-3"
+              />
+            </div>
             <button
               onClick={sendRecoveryEmail}
               disabled={!email || loading}

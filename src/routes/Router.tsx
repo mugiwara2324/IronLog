@@ -1,35 +1,40 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import MobileLayout from "../layouts/MobileLayout";
 
 import ProtectedRoute from "../auth/ProtectedRoute";
 
-import Home from "../pages/Home/Home";
-import Workouts from "../pages/Workouts/Workouts";
-import WorkoutDetail from "../pages/Workouts/WorkoutDetail";
-import WorkoutSession from "../pages/Workouts/WorkoutSession.tsx";
-import WorkoutEdit from "../pages/Workouts/WorkoutEdit";
-import WorkoutActive from "../pages/WorkoutActive/WorkoutActive";
-import WorkoutHistory from "../pages/WorkoutHistory/WorkoutHistory.tsx";
-import WorkoutHistoryEdit from "../pages/WorkoutHistory/WorkoutHistoryEdit";
-
-import Progress from "../pages/Progress/Progress";
-import Photos from "../pages/Photos/Photos";
-import Profile from "../pages/Profile/Profile";
-
-import Exercises from "../pages/Exercises/Exercises";
-import ExerciseDetail from "../pages/Exercises/ExerciseDetail";
-import ExerciseEdit from "../pages/Exercises/ExerciseEdit";
-
-import Login from "../auth/Login";
-import Register from "../auth/Register";
-import ResetPassword from "../auth/ResetPassword";
+const Home = lazy(() => import("../pages/Home/Home"));
+const Workouts = lazy(() => import("../pages/Workouts/Workouts"));
+const WorkoutDetail = lazy(() => import("../pages/Workouts/WorkoutDetail"));
+const WorkoutSession = lazy(() => import("../pages/Workouts/WorkoutSession"));
+const WorkoutEdit = lazy(() => import("../pages/Workouts/WorkoutEdit"));
+const WorkoutActive = lazy(() => import("../pages/WorkoutActive/WorkoutActive"));
+const WorkoutHistory = lazy(() => import("../pages/WorkoutHistory/WorkoutHistory"));
+const WorkoutHistoryEdit = lazy(() => import("../pages/WorkoutHistory/WorkoutHistoryEdit"));
+const Progress = lazy(() => import("../pages/Progress/Progress"));
+const Photos = lazy(() => import("../pages/Photos/Photos"));
+const Profile = lazy(() => import("../pages/Profile/Profile"));
+const Exercises = lazy(() => import("../pages/Exercises/Exercises"));
+const ExerciseDetail = lazy(() => import("../pages/Exercises/ExerciseDetail"));
+const ExerciseEdit = lazy(() => import("../pages/Exercises/ExerciseEdit"));
+const Login = lazy(() => import("../auth/Login"));
+const Register = lazy(() => import("../auth/Register"));
+const ResetPassword = lazy(() => import("../auth/ResetPassword"));
 
 export default function Router() {
   return (
     <BrowserRouter>
       <MobileLayout>
-        <Routes>
+        <Suspense
+          fallback={
+            <div className="p-5 text-neutral-400" role="status">
+              Chargement de la page…
+            </div>
+          }
+        >
+          <Routes>
           {/* Routes publiques */}
 
           <Route path="/login" element={<Login />} />
@@ -163,7 +168,8 @@ export default function Router() {
               </ProtectedRoute>
             }
           />
-        </Routes>
+          </Routes>
+        </Suspense>
       </MobileLayout>
     </BrowserRouter>
   );

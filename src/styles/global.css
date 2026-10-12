@@ -586,22 +586,21 @@ input[type="checkbox"] {
   }
 
   .bottom-navigation {
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    height: calc(74px + env(safe-area-inset-bottom));
+    right: 12px;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    width: calc(100% - 24px);
+    height: 70px;
     justify-content: space-around;
-    padding: 5px 5px calc(5px + env(safe-area-inset-bottom));
+    padding: 5px 6px;
     transform: none;
-    border-right: 0;
-    border-bottom: 0;
-    border-left: 0;
-    border-radius: 22px 22px 0 0;
-    background: rgba(18, 20, 25, 0.91);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 23px;
+    background: rgba(23, 25, 30, 0.92);
   }
 
   .bottom-navigation a {
-    min-width: 62px;
+    min-width: 0;
+    flex: 1;
     height: 54px;
   }
 

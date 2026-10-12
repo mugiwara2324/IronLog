@@ -37,16 +37,11 @@ export default function Login() {
 
   return (
     <div
-      className="
-      min-h-screen
-      flex
-      items-center
-      justify-center
-      p-5
-      "
+      className="auth-page flex items-center justify-center p-5"
     >
       <div
         className="
+        auth-card
         bg-neutral-900
         rounded-3xl
         p-6

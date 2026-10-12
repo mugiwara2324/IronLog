@@ -69,8 +69,8 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-5">
-      <div className="bg-neutral-900 rounded-3xl p-6 w-full max-w-md">
+    <div className="auth-page flex items-center justify-center p-5">
+      <div className="auth-card bg-neutral-900 rounded-3xl p-6 w-full max-w-md">
         <h1 className="text-3xl font-bold">
           {recoveryMode ? "Nouveau mot de passe" : "Mot de passe oublié"}
         </h1>

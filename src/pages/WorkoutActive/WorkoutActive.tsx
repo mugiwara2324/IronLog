@@ -1,608 +1,830 @@
-import { useEffect, useState } from "react";
-
-import { useParams, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import {
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Cloud,
+  CloudOff,
+  LoaderCircle,
+  RefreshCw,
+} from "lucide-react";
 
 import { supabase } from "../../lib/supabase";
 
-import WorkoutExerciseEditor from "../../components/WorkoutExerciseEditor/WorkoutExerciseEditor";
+type SetEntry = {
+  weight: number | string;
+  reps: number | string;
+  completed: boolean;
+};
+
+type ExerciseInfo = {
+  id?: string;
+  name?: string;
+  muscles?: string[];
+};
+
+type WorkoutExerciseInfo = {
+  id?: string;
+  reps?: string | number;
+  weight?: string | number;
+  sets?: number;
+};
+
+type SupabaseActiveExercise = {
+  id: string;
+  workout_id: string;
+  exercise_id: string;
+  order: number | null;
+  done: boolean | null;
+  sets: unknown;
+  comment?: string | null;
+};
+
+type ExerciseRecordInfo = {
+  id: string;
+  max_weight: number | string;
+  max_reps: number | string;
+  max_volume: number | string;
+};
+
+type ActiveExercise = {
+  id: string;
+  workout_id: string;
+  exercise_id: string;
+  order: number;
+  done: boolean;
+  sets: SetEntry[];
+  comment?: string;
+  exercise?: ExerciseInfo | null;
+  workoutExercise?: WorkoutExerciseInfo | null;
+};
+
+type SessionDraft = {
+  userId: string;
+  workoutId: string;
+  activeWorkoutId: string | null;
+  updatedAt: string;
+  revision: number;
+  dirty: boolean;
+  exercises: ActiveExercise[];
+};
+
+type SyncStatus = "saved" | "saving" | "pending" | "offline" | "error";
+
+function cacheKey(userId: string, workoutId: string) {
+  return `ironlog:active-workout:${userId}:${workoutId}`;
+}
+
+function readDraft(key: string): SessionDraft | null {
+  try {
+    const value = localStorage.getItem(key);
+    return value ? (JSON.parse(value) as SessionDraft) : null;
+  } catch {
+    return null;
+  }
+}
+
+function targetRepRange(value: unknown) {
+  const text = String(value ?? "");
+  const rangeMatch = text.match(/(\d+(?:[.,]\d+)?)\s*(?:-|–|—|à|a|to)\s*(\d+(?:[.,]\d+)?)/i);
+  if (rangeMatch) {
+    const first = Number(rangeMatch[1].replace(",", "."));
+    const second = Number(rangeMatch[2].replace(",", "."));
+    if (Number.isFinite(first) && Number.isFinite(second)) {
+      return { min: Math.min(first, second), max: Math.max(first, second) };
+    }
+  }
+
+  const numbers = text.match(/\d+(?:[.,]\d+)?/g)?.map((part) => Number(part.replace(",", ".")));
+  const exact = numbers?.at(-1);
+  return exact !== undefined && Number.isFinite(exact) ? { min: exact, max: exact } : null;
+}
+
+function normalizeExercise(
+  item: SupabaseActiveExercise,
+  workoutId: string,
+  exercise: ExerciseInfo | null,
+  workoutExercise: WorkoutExerciseInfo | null,
+): ActiveExercise {
+  const rawSets: unknown[] = Array.isArray(item.sets) ? item.sets : [];
+  const sets: SetEntry[] = rawSets.map((value) => {
+    const set = value && typeof value === "object" ? value as Record<string, unknown> : {};
+    const weight = set.weight;
+    const reps = set.reps;
+    return {
+      weight: typeof weight === "number" || typeof weight === "string" ? weight : 0,
+      reps: typeof reps === "number" || typeof reps === "string" ? reps : 0,
+      completed: Boolean(set.completed || item.done),
+    };
+  });
+  const done = sets.length > 0 && sets.every((set) => set.completed);
+
+  return {
+    ...item,
+    workout_id: workoutId,
+    order: Number(item.order ?? 0),
+    done,
+    sets,
+    comment: item.comment ?? "",
+    exercise,
+    workoutExercise,
+  };
+}
+
+function getBestWeight(sets: SetEntry[]) {
+  const completed = sets.filter((set) => set.completed);
+  if (completed.length === 0) return 0;
+  return Math.max(...completed.map((set) => Number(set.weight) || 0));
+}
 
 export default function WorkoutActive() {
   const { id } = useParams();
-
   const navigate = useNavigate();
+  const [exercises, setExercises] = useState<ActiveExercise[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [finishing, setFinishing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("saved");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
+  const [setError, setSetError] = useState<{ exerciseId: string; message: string } | null>(null);
 
-  const [exercises, setExercises] = useState<any[]>([]);
+  const latestExercises = useRef<ActiveExercise[]>([]);
+  const revision = useRef(0);
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
+  const saveTimer = useRef<number | null>(null);
+  const retryTimer = useRef<number | null>(null);
+  const retryDelay = useRef(1000);
+  const currentUserId = useRef<string | null>(null);
+  const currentWorkoutId = useRef<string | undefined>(id);
+  const currentActiveWorkoutId = useRef<string | null>(null);
+  const currentCacheKey = useRef<string | null>(null);
+  const startedAt = useRef(new Date().toISOString());
 
-  const [selectedExercise, setSelectedExercise] = useState<any>(null);
-
-  const [newRecords, setNewRecords] = useState<any[]>([]);
-
-  const [activeWorkoutId, setActiveWorkoutId] = useState<string | null>(null);
-
-  async function loadExercises() {
+  const loadExercises = useCallback(async () => {
     if (!id) {
+      setLoading(false);
       return;
     }
 
-    const {
-      data: { user },
-      error: userErr,
-    } = await supabase.auth.getUser();
+    setLoading(true);
+    setErrorMessage(null);
 
-    if (userErr || !user) {
-      return;
-    }
+    try {
+      const { data: sessionResult, error: sessionError } = await supabase.auth.getSession();
+      const user = sessionResult.session?.user;
+      if (sessionError || !user) throw sessionError ?? new Error("Session utilisateur indisponible.");
 
-    const { data: activeWorkout } = await supabase
-      .from("active_workout")
-      .select("*")
-      .eq("workout_id", id)
-      .eq("user_id", user.id)
-      .limit(1);
+      setUserId(user.id);
+      currentUserId.current = user.id;
+      currentWorkoutId.current = id;
+      const key = cacheKey(user.id, id);
+      currentCacheKey.current = key;
+      const draft = readDraft(key);
+      const hasLocalDraft = Boolean(draft && draft.userId === user.id && draft.workoutId === id);
+      const useCachedDraft = hasLocalDraft && (draft?.dirty === true || !navigator.onLine);
 
-    const aw =
-      activeWorkout && activeWorkout.length > 0 ? activeWorkout[0] : null;
-
-    if (aw) {
-      const today = new Date();
-
-      const start = new Date(aw.started_at);
-
-      if (
-        start.getDate() !== today.getDate() ||
-        start.getMonth() !== today.getMonth() ||
-        start.getFullYear() !== today.getFullYear()
-      ) {
-        await supabase
-          .from("active_workout_exercises")
-          .delete()
-          .eq("workout_id", id);
-
-        await supabase
-          .from("active_workout")
-          .delete()
-          .eq("id", aw.id)
-          .eq("user_id", user.id);
-
-        setExercises([]);
-
-        return;
+      if (useCachedDraft && draft) {
+        revision.current = draft.revision;
+        currentActiveWorkoutId.current = draft.activeWorkoutId;
+        latestExercises.current = draft.exercises;
+        setExercises(draft.exercises);
+        setSyncStatus(navigator.onLine ? "pending" : "offline");
+        setExpandedExerciseId(draft.exercises.find((item) => !item.done)?.id ?? draft.exercises[0]?.id ?? null);
       }
 
-      setActiveWorkoutId(aw.id);
-    }
+      if (!navigator.onLine && useCachedDraft) return;
 
-    /*
-      active_workout_exercises ne possède pas user_id
-    */
+      const { data: activeWorkout, error: activeWorkoutError } = await supabase
+        .from("active_workout")
+        .select("id, started_at")
+        .eq("workout_id", id)
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-    const { data: activeExercises, error } = await supabase
-      .from("active_workout_exercises")
-      .select("*")
-      .eq("workout_id", id);
+      if (activeWorkoutError) {
+        if (useCachedDraft) return;
+        throw activeWorkoutError;
+      }
 
-    if (error) {
+      const activeId = activeWorkout?.id ?? (useCachedDraft ? draft?.activeWorkoutId ?? null : null);
+      currentActiveWorkoutId.current = activeId;
+      if (activeWorkout?.started_at) startedAt.current = activeWorkout.started_at;
+
+      const { data: activeRows, error: activeRowsError } = await supabase
+        .from("active_workout_exercises")
+        .select("*")
+        .eq("workout_id", id)
+        .order("order");
+
+      if (activeRowsError) {
+        if (useCachedDraft) return;
+        throw activeRowsError;
+      }
+
+      const activeItems = (activeRows ?? []) as unknown as SupabaseActiveExercise[];
+      const fullExercises = await Promise.all(
+        activeItems.map(async (item) => {
+          const [exerciseResult, workoutExerciseResult] = await Promise.all([
+            supabase.from("exercises").select("*").eq("id", item.exercise_id).maybeSingle(),
+            supabase
+              .from("workout_exercises")
+              .select("*")
+              .eq("workout_id", id)
+              .eq("exercise_id", item.exercise_id)
+              .maybeSingle(),
+          ]);
+
+          if (exerciseResult.error) throw exerciseResult.error;
+          if (workoutExerciseResult.error) throw workoutExerciseResult.error;
+          return normalizeExercise(
+            item,
+            id,
+            exerciseResult.data as ExerciseInfo | null,
+            workoutExerciseResult.data as WorkoutExerciseInfo | null,
+          );
+        }),
+      );
+
+      let visibleExercises = fullExercises;
+      if (useCachedDraft && draft) {
+        const localById = new Map<string, ActiveExercise>(draft.exercises.map((item) => [item.id, item]));
+        const merged = fullExercises.map((item) => {
+          const local = localById.get(item.id);
+          if (!local) return item;
+          return { ...item, ...local, exercise: item.exercise, workoutExercise: item.workoutExercise };
+        });
+        const remoteIds = new Set(fullExercises.map((item) => item.id));
+        visibleExercises = [...merged, ...draft.exercises.filter((item) => !remoteIds.has(item.id))];
+      }
+
+      latestExercises.current = visibleExercises;
+      setExercises(visibleExercises);
+      setExpandedExerciseId(visibleExercises.find((item) => !item.done)?.id ?? visibleExercises[0]?.id ?? null);
+      if (!draft?.dirty) setSyncStatus("saved");
+    } catch (error) {
       console.error("Erreur récupération exercices actifs :", error);
-
-      return;
+      if (latestExercises.current.length > 0) {
+        setSyncStatus(navigator.onLine ? "pending" : "offline");
+      } else {
+        setErrorMessage("Impossible de charger cette séance. Vérifie ta connexion puis réessaie.");
+        setSyncStatus(navigator.onLine ? "error" : "offline");
+      }
+    } finally {
+      setLoading(false);
     }
-
-    console.log("ACTIVE EXERCISES :", activeExercises);
-
-    const sortedActiveExercises = (activeExercises ?? [])
-      .slice()
-      .sort((a: any, b: any) => Number(a.order) - Number(b.order));
-
-    const fullExercises = await Promise.all(
-      sortedActiveExercises.map(async (item: any) => {
-        const { data: exercise } = await supabase
-          .from("exercises")
-          .select("*")
-          .eq("id", item.exercise_id)
-          .limit(1);
-
-        const { data: workoutExercise } = await supabase
-          .from("workout_exercises")
-          .select("*")
-          .eq("workout_id", id)
-          .eq("exercise_id", item.exercise_id)
-          .limit(1);
-
-        return {
-          ...item,
-
-          workout_id: id,
-
-          exercise: exercise && exercise.length > 0 ? exercise[0] : null,
-
-          workoutExercise:
-            workoutExercise && workoutExercise.length > 0
-              ? workoutExercise[0]
-              : null,
-        };
-      }),
-    );
-
-    setExercises(fullExercises);
-
-    if (fullExercises.length === 0) {
-      console.warn("Séance active vide détectée");
-    }
-  }
-
-  useEffect(() => {
-    loadExercises();
   }, [id]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      saveCurrentState();
-    }, 5000);
+    // This route effect owns the loading and error state for its remote reads.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadExercises();
+  }, [loadExercises]);
 
-    return () => {
-      clearInterval(interval);
+  function makeDraft(items: ActiveExercise[], nextRevision: number, dirty: boolean): SessionDraft | null {
+    const currentUser = currentUserId.current;
+    const workoutId = currentWorkoutId.current;
+    if (!currentUser || !workoutId) return null;
+
+    return {
+      userId: currentUser,
+      workoutId,
+      activeWorkoutId: currentActiveWorkoutId.current,
+      updatedAt: new Date().toISOString(),
+      revision: nextRevision,
+      dirty,
+      exercises: items,
     };
-  }, [exercises]);
+  }
 
-  async function toggleExercise(activeExerciseId: string, done: boolean) {
-    const { error } = await supabase
-      .from("active_workout_exercises")
-      .update({
-        done,
+  async function syncDraft(draft: SessionDraft): Promise<boolean> {
+    if (!navigator.onLine) {
+      setSyncStatus("offline");
+      return false;
+    }
+
+    let succeeded = false;
+    saveQueue.current = saveQueue.current
+      .catch(() => undefined)
+      .then(async () => {
+        if (draft.revision !== revision.current) return;
+        setSyncStatus("saving");
+
+        for (const item of draft.exercises) {
+          const { data, error } = await supabase
+            .from("active_workout_exercises")
+            .update({ done: item.done, sets: item.sets, comment: item.comment ?? "" })
+            .eq("id", item.id)
+            .select("id")
+            .maybeSingle();
+          if (error) throw error;
+          if (!data) throw new Error("Une série active n’a pas été retrouvée côté serveur.");
+        }
+
+        if (draft.activeWorkoutId) {
+          const { data, error } = await supabase
+            .from("active_workout")
+            .update({ updated_at: new Date().toISOString() })
+            .eq("id", draft.activeWorkoutId)
+            .select("id")
+            .maybeSingle();
+          if (error) throw error;
+          if (!data) throw new Error("La séance active n’a pas été retrouvée côté serveur.");
+        }
+
+        if (draft.revision === revision.current) {
+          const key = currentCacheKey.current;
+          const localDraft = key ? readDraft(key) : null;
+          if (key && localDraft?.revision === draft.revision) {
+            localStorage.setItem(key, JSON.stringify({ ...localDraft, dirty: false }));
+          }
+          setSyncStatus("saved");
+          setErrorMessage(null);
+          retryDelay.current = 1000;
+          if (retryTimer.current !== null) {
+            window.clearTimeout(retryTimer.current);
+            retryTimer.current = null;
+          }
+          succeeded = true;
+        }
       })
-      .eq("id", activeExerciseId);
+      .catch((error) => {
+        console.error("Synchronisation de la séance impossible :", error);
+        if (draft.revision === revision.current) {
+          setSyncStatus(navigator.onLine ? "pending" : "offline");
+          setErrorMessage("Tes changements sont gardés sur cet appareil et seront renvoyés dès que la connexion revient.");
+          if (navigator.onLine && retryTimer.current === null) {
+            const delay = retryDelay.current;
+            retryDelay.current = Math.min(retryDelay.current * 2, 30_000);
+            retryTimer.current = window.setTimeout(() => {
+              retryTimer.current = null;
+              const latestDraft = makeDraft(latestExercises.current, revision.current, true);
+              if (latestDraft) void syncDraft(latestDraft);
+            }, delay);
+          }
+        }
+      });
 
-    if (error) {
-      console.error("Erreur update exercice :", error);
+    await saveQueue.current;
+    return succeeded;
+  }
 
-      return;
+  function commitExercises(next: ActiveExercise[]) {
+    latestExercises.current = next;
+    setExercises(next);
+    setErrorMessage(null);
+
+    const nextRevision = revision.current + 1;
+    revision.current = nextRevision;
+    retryDelay.current = 1000;
+    if (retryTimer.current !== null) {
+      window.clearTimeout(retryTimer.current);
+      retryTimer.current = null;
+    }
+    const draft = makeDraft(next, nextRevision, true);
+    if (!draft) return;
+
+    try {
+      if (currentCacheKey.current) localStorage.setItem(currentCacheKey.current, JSON.stringify(draft));
+      setSyncStatus(navigator.onLine ? "saving" : "offline");
+    } catch (error) {
+      console.error("Brouillon local indisponible :", error);
+      setSyncStatus("error");
+      setErrorMessage("Le stockage local est indisponible. Garde la page ouverte jusqu’à la synchronisation.");
     }
 
-    if (activeWorkoutId) {
-      await supabase
-        .from("active_workout")
-        .update({
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", activeWorkoutId);
-    }
+    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => {
+      void syncDraft(draft);
+      saveTimer.current = null;
+    }, 650);
+  }
 
-    setExercises((prev) =>
-      prev.map((item) =>
-        item.id === activeExerciseId
-          ? {
-              ...item,
-              done,
-            }
-          : item,
-      ),
+  function updateSet(exerciseId: string, setIndex: number, field: "weight" | "reps", value: string) {
+    const current = latestExercises.current.find((item) => item.id === exerciseId);
+    if (!current) return;
+
+    const sets = current.sets.map((set, index) =>
+      index === setIndex ? { ...set, [field]: value } : set,
     );
+    commitExercises(latestExercises.current.map((item) => (item.id === exerciseId ? { ...item, sets } : item)));
   }
 
-  function getBestWeight(sets: any[]) {
-    if (!sets || sets.length === 0) {
-      return 0;
-    }
+  function validateSet(exerciseId: string, setIndex: number) {
+    const current = latestExercises.current.find((item) => item.id === exerciseId);
+    const selectedSet = current?.sets[setIndex];
+    if (!current || !selectedSet) return;
 
-    const maxReps = Math.max(...sets.map((set) => Number(set.reps)));
-
-    const bestSets = sets.filter((set) => Number(set.reps) === maxReps);
-
-    return Math.max(...bestSets.map((set) => Number(set.weight)));
-  }
-  async function checkRecord(item: any) {
-    if (!item.sets || item.sets.length === 0) {
+    const weight = Number(selectedSet.weight);
+    const reps = Number(selectedSet.reps);
+    if (!Number.isFinite(weight) || weight < 0 || !Number.isFinite(reps) || reps < 1) {
+      setSetError({ exerciseId, message: "Renseigne une charge et au moins une répétition." });
       return;
     }
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const sets = current.sets.map((set, index) =>
+      index === setIndex ? { ...set, weight, reps, completed: true } : { ...set },
+    );
+    const range = targetRepRange(current.workoutExercise?.reps);
 
-    if (userError || !user) {
-      return;
+    // A validated set in the programmed rep range carries its load forward to the remaining sets.
+    // Sets above or below the target range never raise the following loads automatically.
+    if (range && reps >= range.min && reps <= range.max) {
+      for (let index = setIndex + 1; index < sets.length; index += 1) {
+        if (!sets[index].completed) sets[index] = { ...sets[index], weight };
+      }
     }
 
-    const bestSet = item.sets.reduce((best: any, current: any) => {
-      const currentVolume = Number(current.weight) * Number(current.reps);
+    const done = sets.length > 0 && sets.every((set) => set.completed);
+    const next = latestExercises.current.map((item) =>
+      item.id === exerciseId ? { ...item, sets, done } : item,
+    );
+    setSetError(null);
+    commitExercises(next);
+  }
 
-      const bestVolume = Number(best.weight) * Number(best.reps);
-
-      return currentVolume > bestVolume ? current : best;
+  function reopenSet(exerciseId: string, setIndex: number) {
+    const next = latestExercises.current.map((item) => {
+      if (item.id !== exerciseId) return item;
+      const sets = item.sets.map((set, index) => index === setIndex ? { ...set, completed: false } : set);
+      return { ...item, sets, done: sets.length > 0 && sets.every((set) => set.completed) };
     });
+    commitExercises(next);
+  }
 
-    const volume = Number(bestSet.weight) * Number(bestSet.reps);
+  async function saveCurrentState() {
+    if (saveTimer.current !== null) {
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
 
-    const { data: recordData } = await supabase
+    const draft = makeDraft(latestExercises.current, revision.current, true);
+    if (!draft) return false;
+    try {
+      if (currentCacheKey.current) localStorage.setItem(currentCacheKey.current, JSON.stringify(draft));
+    } catch (error) {
+      console.error("Impossible de sauvegarder le brouillon local :", error);
+    }
+    return syncDraft(draft);
+  }
+
+  // The listener uses stable refs so it only needs to be registered once.
+  /* eslint-disable react-hooks/exhaustive-deps */
+  useEffect(() => {
+    function onOnline() {
+      if (retryTimer.current !== null) {
+        window.clearTimeout(retryTimer.current);
+        retryTimer.current = null;
+      }
+      retryDelay.current = 1000;
+      const key = currentCacheKey.current;
+      const draft = key ? readDraft(key) : null;
+      if (!draft?.dirty) {
+        setSyncStatus("saved");
+        return;
+      }
+      revision.current = Math.max(revision.current, draft.revision);
+      void syncDraft(draft);
+    }
+
+    function onOffline() {
+      if (readDraft(currentCacheKey.current ?? "")?.dirty) setSyncStatus("offline");
+    }
+
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+      if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
+      if (retryTimer.current !== null) window.clearTimeout(retryTimer.current);
+    };
+  }, []);
+  /* eslint-enable react-hooks/exhaustive-deps */
+
+  async function checkRecord(item: ActiveExercise) {
+    const completedSets = item.sets.filter((set) => set.completed);
+    if (completedSets.length === 0) return;
+
+    const { data: rawRecordData, error: recordError } = await supabase
       .from("records")
       .select("*")
       .eq("exercise_id", item.exercise_id)
-      .eq("user_id", user.id)
-      .limit(1);
+      .eq("user_id", userId)
+      .maybeSingle();
 
-    const record = recordData && recordData.length > 0 ? recordData[0] : null;
-
-    let isNew = false;
-
-    if (!record) {
-      await supabase.from("records").insert({
-        user_id: user.id,
-
-        exercise_id: item.exercise_id,
-
-        max_weight: Number(bestSet.weight),
-
-        max_reps: Number(bestSet.reps),
-
-        max_volume: volume,
-
-        date: new Date().toISOString(),
-      });
-
-      isNew = true;
-    } else if (
-      Number(bestSet.weight) > Number(record.max_weight) ||
-      Number(bestSet.reps) > Number(record.max_reps) ||
-      volume > Number(record.max_volume)
-    ) {
-      await supabase
-        .from("records")
-        .update({
-          max_weight: Math.max(
-            Number(record.max_weight),
-            Number(bestSet.weight),
-          ),
-
-          max_reps: Math.max(Number(record.max_reps), Number(bestSet.reps)),
-
-          max_volume: Math.max(Number(record.max_volume), volume),
-
-          date: new Date().toISOString(),
-        })
-        .eq("id", record.id);
-
-      isNew = true;
+    if (recordError) {
+      console.error("Erreur lecture record :", recordError);
+      return;
     }
 
-    if (isNew) {
-      setNewRecords((prev) => [
-        ...prev,
+    const recordData = rawRecordData as ExerciseRecordInfo | null;
+    const bestSet = completedSets.reduce((best, current) =>
+      Number(current.weight) * Number(current.reps) > Number(best.weight) * Number(best.reps)
+        ? current
+        : best,
+    );
+    const volume = Number(bestSet.weight) * Number(bestSet.reps);
 
-        {
-          name: item.exercise?.name,
+    if (!recordData) {
+      const { error } = await supabase.from("records").insert({
+        user_id: userId,
+        exercise_id: item.exercise_id,
+        max_weight: Number(bestSet.weight),
+        max_reps: Number(bestSet.reps),
+        max_volume: volume,
+        date: new Date().toISOString(),
+      });
+      if (error) console.error("Erreur création record :", error);
+      return;
+    }
 
-          weight: Number(bestSet.weight),
-
-          reps: Number(bestSet.reps),
-        },
-      ]);
+    if (
+      Number(bestSet.weight) > Number(recordData.max_weight) ||
+      Number(bestSet.reps) > Number(recordData.max_reps) ||
+      volume > Number(recordData.max_volume)
+    ) {
+      const { error } = await supabase
+        .from("records")
+        .update({
+          max_weight: Math.max(Number(recordData.max_weight), Number(bestSet.weight)),
+          max_reps: Math.max(Number(recordData.max_reps), Number(bestSet.reps)),
+          max_volume: Math.max(Number(recordData.max_volume), volume),
+          date: new Date().toISOString(),
+        })
+        .eq("id", recordData.id);
+      if (error) console.error("Erreur mise à jour record :", error);
     }
   }
 
   async function finishWorkout() {
-    await saveCurrentState();
-
-    if (!id) {
+    if (!id || finishing) return;
+    if (exercises.length === 0 || exercises.some((exercise) => !exercise.done)) {
+      setErrorMessage("Valide chaque série pour terminer les exercices de ta séance.");
+      return;
+    }
+    if (!navigator.onLine) {
+      setSyncStatus("offline");
+      setErrorMessage("Tes séries sont gardées sur cet appareil. Reconnecte-toi pour enregistrer la séance dans ton historique.");
       return;
     }
 
-    const {
-      data: { user },
-      error: userErr,
-    } = await supabase.auth.getUser();
+    setFinishing(true);
+    setErrorMessage(null);
 
-    if (userErr || !user) {
-      console.error("Utilisateur non authentifié");
+    try {
+      const synced = await saveCurrentState();
+      if (!synced) throw new Error("La synchronisation n’est pas terminée. Réessaie dans un instant.");
 
-      return;
-    }
-
-    /*
-      Une séance vide est autorisée
-      (cas crash / bug / test)
-    */
-
-    const allDone =
-      exercises.length === 0 ||
-      exercises.every((exercise) => exercise.done === true);
-
-    if (!allDone) {
-      alert(
-        "Tous les exercices doivent être terminés avant de valider la séance.",
+      const now = new Date().toISOString();
+      const volume = exercises.reduce(
+        (total, item) => total + item.sets.reduce((subtotal, set) => subtotal + Number(set.weight) * Number(set.reps), 0),
+        0,
       );
 
-      return;
-    }
+      const { data: session, error: sessionError } = await supabase
+        .from("workout_sessions")
+        .insert({
+          user_id: userId,
+          workout_id: id,
+          started_at: startedAt.current,
+          finished_at: now,
+          volume,
+          completed_exercises: exercises.length,
+        })
+        .select()
+        .single();
 
-    const confirm = window.confirm(
-      "Terminer cette séance ?\n\nElle sera enregistrée dans ton historique.",
-    );
+      if (sessionError) throw sessionError;
 
-    if (!confirm) {
-      return;
-    }
+      const performedSets = exercises.flatMap((item) =>
+        item.sets.flatMap((set, index) => set.completed ? [{
+          session_id: session.id,
+          exercise_id: item.exercise_id,
+          weight: Number(set.weight),
+          reps: Number(set.reps),
+          set_number: index + 1,
+        }] : []),
+      );
 
-    let volume = 0;
+      if (performedSets.length > 0) {
+        const { error: performedError } = await supabase.from("performed_sets").insert(performedSets);
+        if (performedError) {
+          await supabase.from("workout_sessions").delete().eq("id", session.id);
+          throw performedError;
+        }
+      }
 
-    for (const item of exercises) {
-      item.sets?.forEach((set: any) => {
-        volume += Number(set.weight) * Number(set.reps);
-      });
-
-      if (item.sets?.length) {
+      for (const item of exercises) {
         const bestWeight = getBestWeight(item.sets);
+        const oldWeight = Number(item.workoutExercise?.weight ?? 0);
 
-        const oldWeight = item.workoutExercise?.weight;
-
-        if (oldWeight !== undefined && bestWeight > Number(oldWeight)) {
-          await supabase.from("weight_history").insert({
-            user_id: user.id,
-
+        if (bestWeight > oldWeight) {
+          const { error: historyError } = await supabase.from("weight_history").insert({
+            user_id: userId,
             exercise_id: item.exercise_id,
-
             old_weight: oldWeight,
-
             new_weight: bestWeight,
-
-            date: new Date().toISOString(),
+            date: now,
           });
+          if (historyError) console.error("Erreur historique des charges :", historyError);
 
           if (item.workoutExercise?.id) {
-            await supabase
+            const { error: workoutExerciseError } = await supabase
               .from("workout_exercises")
-              .update({
-                weight: bestWeight,
-              })
+              .update({ weight: bestWeight })
               .eq("id", item.workoutExercise.id);
+            if (workoutExerciseError) console.error("Erreur mise à jour charge cible :", workoutExerciseError);
           }
         }
 
         await checkRecord(item);
       }
-    }
 
-    /*
-      Historique séance
-    */
-
-    const { data: session, error: sessionError } = await supabase
-      .from("workout_sessions")
-      .insert({
-        user_id: user.id,
-
-        workout_id: id,
-
-        started_at: new Date().toISOString(),
-
-        finished_at: new Date().toISOString(),
-
-        volume,
-
-        completed_exercises: exercises.length,
-      })
-      .select()
-      .single();
-
-    if (sessionError) {
-      console.error("Erreur création session :", sessionError);
-
-      return;
-    } /*
-      Sauvegarde des séries réalisées
-    */
-
-    const performedSets: any[] = [];
-
-    for (const item of exercises) {
-      for (const set of item.sets ?? []) {
-        performedSets.push({
-          session_id: session.id,
-          exercise_id: item.exercise_id,
-          weight: Number(set.weight),
-          reps: Number(set.reps),
-          set_number: item.sets.indexOf(set) + 1,
-        });
-      }
-    }
-
-    if (performedSets.length > 0) {
-      const { error: performedError } = await supabase
-        .from("performed_sets")
-        .insert(performedSets);
-
-      if (performedError) {
-        console.error("Erreur performed sets :", performedError);
-      }
-    }
-
-    /*
-      Suppression séance active
-    */
-
-    const { error: deleteExercisesError } = await supabase
-      .from("active_workout_exercises")
-      .delete()
-      .eq("workout_id", id);
-
-    if (deleteExercisesError) {
-      console.error(
-        "Erreur suppression exercices actifs :",
-        deleteExercisesError,
-      );
-    }
-
-    if (activeWorkoutId) {
-      await supabase.from("active_workout").delete().eq("id", activeWorkoutId);
-    }
-
-    navigate("/");
-  }
-
-  async function saveCurrentState() {
-    for (const item of exercises) {
-      await supabase
+      const { error: cleanupError } = await supabase
         .from("active_workout_exercises")
-        .update({
-          done: item.done,
+        .delete()
+        .eq("workout_id", id);
+      if (cleanupError) console.error("Erreur nettoyage séance active :", cleanupError);
 
-          sets: item.sets,
+      if (currentActiveWorkoutId.current) {
+        const { error } = await supabase
+          .from("active_workout")
+          .delete()
+          .eq("id", currentActiveWorkoutId.current);
+        if (error) console.error("Erreur suppression séance active :", error);
+      }
 
-          comment: item.comment,
-        })
-        .eq("id", item.id);
-    }
-
-    if (activeWorkoutId) {
-      await supabase
-        .from("active_workout")
-        .update({
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", activeWorkoutId);
+      if (currentCacheKey.current) localStorage.removeItem(currentCacheKey.current);
+      navigate(`/workout-history/${session.id}`);
+    } catch (error: unknown) {
+      console.error("Erreur de fin de séance :", error);
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "La séance n’a pas pu être enregistrée. Tes séries restent disponibles pour réessayer.",
+      );
+      setSyncStatus(navigator.onLine ? "pending" : "offline");
+    } finally {
+      setFinishing(false);
     }
   }
 
-  const allDone =
-    exercises.length === 0 ||
-    exercises.every((exercise) => exercise.done === true);
+  if (loading) return <div className="text-neutral-400">Chargement de ta séance…</div>;
+
+  const totalSets = exercises.reduce((total, item) => total + item.sets.length, 0);
+  const completedSets = exercises.reduce((total, item) => total + item.sets.filter((set) => set.completed).length, 0);
+  const completedExercises = exercises.filter((item) => item.done).length;
+  const allDone = exercises.length > 0 && completedExercises === exercises.length;
+  const progress = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0;
+  const SyncIcon = syncStatus === "saved"
+    ? CheckCircle2
+    : syncStatus === "saving"
+      ? LoaderCircle
+      : syncStatus === "offline"
+        ? CloudOff
+        : Cloud;
+  const syncLabel = {
+    saved: "Enregistré",
+    saving: "Enregistrement",
+    pending: "À synchroniser",
+    offline: "Hors ligne",
+    error: "À vérifier",
+  }[syncStatus];
 
   return (
     <div>
-      <h1 className="text-3xl font-bold">Séance en cours</h1>
+      <header className="session-header">
+        <div>
+          <p className="session-kicker">Entraînement en cours</p>
+          <h1>Ta séance</h1>
+          <p className="text-sm text-neutral-400">Chaque série validée est sauvegardée au fur et à mesure.</p>
+        </div>
+        <div className={`sync-indicator is-${syncStatus}`} aria-live="polite">
+          <SyncIcon size={15} className={syncStatus === "saving" ? "animate-spin" : ""} aria-hidden="true" />
+          <span>{syncLabel}</span>
+        </div>
+      </header>
 
-      <p className="mt-2 text-neutral-400">
-        {exercises.filter((item) => item.done).length}/{exercises.length}
-        exercices terminés
-      </p>
+      <section className="session-summary" aria-label="Progression de la séance">
+        <div className="session-summary-top">
+          <strong>{completedExercises}<span> / {exercises.length}</span></strong>
+          <span>{completedSets} / {totalSets} séries</span>
+        </div>
+        <div className="session-progress-track" role="progressbar" aria-label="Séries validées" aria-valuenow={completedSets} aria-valuemin={0} aria-valuemax={totalSets}>
+          <div className="session-progress-fill" style={{ width: `${progress}%` }} />
+        </div>
+        <p className="session-summary-caption">{allDone ? "Tout est prêt. Tu peux terminer la séance." : "Valide chaque série pour faire avancer ta séance."}</p>
+      </section>
 
-      <div className="mt-8 space-y-4">
-        {exercises.map((item, index) => (
-          <div
-            key={item.id}
-            onClick={() => setSelectedExercise(item)}
-            className="
-              bg-neutral-900
-              rounded-3xl
-              p-5
-              cursor-pointer
-            "
-          >
-            <div className="flex gap-3 items-center">
-              <input
-                type="checkbox"
-                checked={item.done}
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) => toggleExercise(item.id, e.target.checked)}
-              />
+      {errorMessage && <p role="alert" className="mt-4 rounded-2xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-400">{errorMessage}</p>}
 
-              <h2 className="font-bold text-lg">
-                {index + 1}. {item.exercise?.name}
-              </h2>
-            </div>
+      {exercises.length === 0 && !errorMessage && (
+        <p className="mt-6 rounded-2xl bg-neutral-900 p-5 text-sm text-neutral-400">Aucun exercice n’est associé à cette séance.</p>
+      )}
 
-            <p className="mt-3 text-neutral-400">
-              {item.workoutExercise?.sets} séries ×{item.workoutExercise?.reps}
-            </p>
+      <div className="active-exercise-list">
+        {exercises.map((item, index) => {
+          const expanded = expandedExerciseId === item.id;
+          const repRange = item.workoutExercise?.reps;
+          const range = targetRepRange(repRange);
 
-            <p className="mt-1">
-              Charge validée :
-              {item.sets ? ` ${getBestWeight(item.sets)} kg` : " -"}
-            </p>
-          </div>
-        ))}
+          return (
+            <section key={item.id} className={`active-exercise-card${item.done ? " is-complete" : ""}`}>
+              <button
+                type="button"
+                className="exercise-heading"
+                onClick={() => setExpandedExerciseId(expanded ? null : item.id)}
+                aria-expanded={expanded}
+              >
+                <span className="exercise-title-wrap">
+                  <span className="exercise-index">{item.done ? <Check size={18} aria-hidden="true" /> : String(index + 1).padStart(2, "0")}</span>
+                  <span>
+                    <span className="exercise-name">{item.exercise?.name ?? "Exercice"}</span>
+                    <span className="exercise-meta">{item.sets.length} séries · {range ? `${range.min}–${range.max} reps` : `${repRange ?? "répétitions libres"} reps`} · {item.workoutExercise?.weight ?? 0} kg</span>
+                  </span>
+                </span>
+                <span className="exercise-state">
+                  {item.done ? <><CheckCircle2 size={17} aria-hidden="true" /> Terminé</> : <>{item.sets.filter((set) => set.completed).length}/{item.sets.length} séries</>}
+                  {expanded ? <ChevronUp size={17} aria-hidden="true" /> : <ChevronDown size={17} aria-hidden="true" />}
+                </span>
+              </button>
 
-        <button
-          disabled={!allDone}
-          onClick={finishWorkout}
-          className="
-            mt-8
-            w-full
-            bg-white
-            text-black
-            rounded-2xl
-            py-4
-            font-semibold
-            disabled:opacity-40
-          "
-        >
-          {exercises.length === 0
-            ? "Terminer la séance"
-            : allDone
-              ? "Terminer la séance"
-              : "Termine tous les exercices"}
-        </button>
+              {expanded && (
+                <div className="exercise-set-list">
+                  {item.sets.map((set, setIndex) => (
+                    <div key={setIndex} className={`set-row${set.completed ? " is-complete" : ""}`}>
+                      <span className="set-number">Série {setIndex + 1}</span>
+                      <div className="set-field">
+                        <label htmlFor={`weight-${item.id}-${setIndex}`}>Poids · kg</label>
+                        <input
+                          id={`weight-${item.id}-${setIndex}`}
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          step="0.5"
+                          value={set.weight}
+                          disabled={set.completed}
+                          onChange={(event) => updateSet(item.id, setIndex, "weight", event.target.value)}
+                          aria-label={`Poids de la série ${setIndex + 1} de ${item.exercise?.name ?? "l’exercice"}, en kilogrammes`}
+                        />
+                      </div>
+                      <div className="set-field">
+                        <label htmlFor={`reps-${item.id}-${setIndex}`}>Répétitions</label>
+                        <input
+                          id={`reps-${item.id}-${setIndex}`}
+                          type="number"
+                          inputMode="numeric"
+                          min="1"
+                          step="1"
+                          value={set.reps}
+                          disabled={set.completed}
+                          onChange={(event) => updateSet(item.id, setIndex, "reps", event.target.value)}
+                          aria-label={`Répétitions de la série ${setIndex + 1} de ${item.exercise?.name ?? "l’exercice"}`}
+                        />
+                      </div>
+                      {set.completed ? (
+                        <button type="button" className="set-confirm-button is-ready" onClick={() => reopenSet(item.id, setIndex)} aria-label={`Corriger la série ${setIndex + 1}`}>
+                          <Check size={17} aria-hidden="true" /><span>Corriger</span>
+                        </button>
+                      ) : (
+                        <button type="button" className="set-confirm-button is-ready" onClick={() => validateSet(item.id, setIndex)} aria-label={`Valider la série ${setIndex + 1}`}>
+                          <Check size={17} aria-hidden="true" /><span>Valider</span>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {setError?.exerciseId === item.id && <p role="alert" className="set-error">{setError.message}</p>}
+                  {item.done && <p className="px-2 pb-1 text-xs font-medium text-lime-300">Exercice terminé · toutes les séries sont validées</p>}
+                </div>
+              )}
+            </section>
+          );
+        })}
       </div>
 
-      {selectedExercise && (
-        <WorkoutExerciseEditor
-          item={selectedExercise}
-          onClose={() => setSelectedExercise(null)}
-          onSave={async () => {
-            await loadExercises();
-
-            setSelectedExercise(null);
-          }}
-        />
-      )}
-
-      {newRecords.length > 0 && (
-        <div
-          className="
-            fixed
-            inset-0
-            bg-black/70
-            flex
-            items-center
-            justify-center
-            p-4
-          "
+      {syncStatus !== "saved" && (
+        <button
+          type="button"
+          onClick={() => void saveCurrentState()}
+          disabled={!navigator.onLine || finishing}
+          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-neutral-800 py-3 text-sm font-semibold disabled:opacity-50"
         >
-          <div
-            className="
-              bg-neutral-900
-              rounded-3xl
-              p-6
-              w-full
-              max-w-md
-            "
-          >
-            <h2 className="text-2xl font-bold">🏆 Nouveau(x) record(s)</h2>
-
-            {newRecords.map((record, index) => (
-              <div
-                key={index}
-                className="
-                  bg-neutral-800
-                  rounded-2xl
-                  p-4
-                  mt-4
-                "
-              >
-                <p className="font-bold">{record.name}</p>
-
-                <p>
-                  {record.weight}kg × {record.reps}
-                </p>
-              </div>
-            ))}
-
-            <button
-              onClick={() => navigate("/")}
-              className="
-                mt-6
-                w-full
-                bg-white
-                text-black
-                rounded-2xl
-                py-3
-              "
-            >
-              Continuer
-            </button>
-          </div>
-        </div>
+          <RefreshCw size={16} aria-hidden="true" /> Réessayer la synchronisation
+        </button>
       )}
+
+      <button
+        type="button"
+        onClick={() => void finishWorkout()}
+        disabled={!allDone || finishing || syncStatus !== "saved"}
+        className="finish-workout-button w-full rounded-2xl bg-white py-4 font-semibold disabled:opacity-40"
+      >
+        {finishing ? "Enregistrement de la séance…" : allDone ? "Terminer la séance" : "Valide toutes les séries"}
+      </button>
+      {!allDone && exercises.length > 0 && <p className="finish-workout-hint">L’exercice se termine automatiquement après sa dernière série.</p>}
     </div>
   );
 }

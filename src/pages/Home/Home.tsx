@@ -27,6 +27,14 @@ function getStartOfCurrentWeek() {
   return date.toISOString();
 }
 
+function getInitialReps(value: unknown) {
+  const text = String(value ?? "");
+  const range = text.match(/(\d+(?:[.,]\d+)?)\s*(?:-|–|—|à|a|to)\s*\d+(?:[.,]\d+)?/i);
+  const afterMultiplier = text.match(/\d+\s*[x×]\s*(\d+(?:[.,]\d+)?)/i);
+  const first = range?.[1] ?? afterMultiplier?.[1] ?? text.match(/\d+(?:[.,]\d+)?/)?.[0] ?? "0";
+  return Number(first.replace(",", "."));
+}
+
 export default function Home() {
   const navigate = useNavigate();
   const [workouts, setWorkouts] = useState<WorkoutTemplate[]>([]);
@@ -80,6 +88,8 @@ export default function Home() {
   }
 
   useEffect(() => {
+    // Loading the authenticated home screen is the effect's external data sync.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, []);
 
@@ -147,7 +157,7 @@ export default function Home() {
         done: false,
         sets: Array.from({ length: exercise.sets }, () => ({
           weight: exercise.weight,
-          reps: Number(String(exercise.reps).replace(/[^\d-]/g, "").split("-")[0]),
+          reps: getInitialReps(exercise.reps),
         })),
       }));
 
@@ -172,7 +182,7 @@ export default function Home() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold">Bonjour Quentin</h1>
+      <h1 className="text-3xl font-bold">Bon retour</h1>
 
       <section className="mt-8 bg-neutral-900 rounded-3xl p-6">
         <p className="text-sm text-neutral-400">Aujourd&apos;hui · {getDayName(todayDay)}</p>

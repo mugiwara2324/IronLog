@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 
 import BottomNavigation from "../components/layout/BottomNavigation";
 
@@ -7,18 +8,14 @@ interface Props {
 }
 
 export default function MobileLayout({ children }: Props) {
-  return (
-    <div
-      className="
-      min-h-screen
-      bg-neutral-950
-      text-white
-      pb-24
-    "
-    >
-      <main className="p-5">{children}</main>
+  const { pathname } = useLocation();
+  const isAuthPage = ["/login", "/register", "/reset-password"].includes(pathname);
 
-      <BottomNavigation />
+  return (
+    <div className="app-shell">
+      <main className={`app-content${isAuthPage ? " auth-content" : ""}`}>{children}</main>
+
+      {!isAuthPage && <BottomNavigation />}
     </div>
   );
 }

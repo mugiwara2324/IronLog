@@ -1,162 +1,198 @@
-import { useEffect, useState } from "react";
-
-import { useParams, useNavigate } from "react-router-dom";
-
-import { supabase } from "../../lib/supabase";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
 import ExerciseFormModal from "../../components/exercises/ExerciseFormModal";
+import { supabase } from "../../lib/supabase";
+import { updateWorkout } from "../../services/supabaseWorkoutService";
+
+const DAYS = [
+  { value: 1, label: "Lundi" },
+  { value: 2, label: "Mardi" },
+  { value: 3, label: "Mercredi" },
+  { value: 4, label: "Jeudi" },
+  { value: 5, label: "Vendredi" },
+  { value: 6, label: "Samedi" },
+  { value: 7, label: "Dimanche" },
+];
+
+type WorkoutRecord = {
+  id: string;
+  name: string;
+  day_of_week: number;
+  description?: string | null;
+};
+
+type ExerciseSummary = {
+  id: string;
+  name: string;
+};
+
+type WorkoutExerciseRow = {
+  id: string | number;
+  exercise_id: string | number;
+  order?: number | null;
+  order_index?: number | null;
+  sets: number | string;
+  reps: number | string;
+  weight: number | string;
+  exercise?: ExerciseSummary | null;
+  exerciseId?: string | number;
+};
+
+type SavedWorkoutExercise = {
+  id: string | number;
+  exercise_id: string | number;
+  weight: number | string;
+};
 
 export default function WorkoutEdit() {
   const { id } = useParams();
-
   const navigate = useNavigate();
-
-  const [workout, setWorkout] = useState<any>(null);
-
-  const [exercises, setExercises] = useState<any[]>([]);
-
+  const [workout, setWorkout] = useState<WorkoutRecord | null>(null);
+  const [exercises, setExercises] = useState<WorkoutExerciseRow[]>([]);
   const [showAdd, setShowAdd] = useState(false);
-
   const [saving, setSaving] = useState(false);
-
+  const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!id) return;
 
-    const { data: workoutData } = await supabase
-      .from("workouts")
-      .select("*")
-      .eq("id", id)
-      .limit(1);
+    setLoading(true);
+    setErrorMessage(null);
 
-    setWorkout(workoutData && workoutData[0] ? workoutData[0] : null);
+    try {
+      const [workoutResult, exerciseResult] = await Promise.all([
+        supabase.from("workouts").select("*").eq("id", id).single(),
+        supabase.from("workout_exercises").select("*").eq("workout_id", id),
+      ]);
 
-    const { data: data } = await supabase
-      .from("workout_exercises")
-      .select("*")
-      .eq("workout_id", id);
+      if (workoutResult.error) throw workoutResult.error;
+      if (exerciseResult.error) throw exerciseResult.error;
 
-    const sortedData = (data ?? [])
-      .slice()
-      .sort((a: any, b: any) =>
-        Number(a.order ?? a.order_index ?? 0) -
-        Number(b.order ?? b.order_index ?? 0),
+      setWorkout(workoutResult.data as WorkoutRecord);
+
+      const sortedData = ([...(exerciseResult.data ?? [])] as WorkoutExerciseRow[]).sort(
+        (a, b) =>
+          Number(a.order ?? a.order_index ?? 0) -
+          Number(b.order ?? b.order_index ?? 0),
       );
 
-    const full = await Promise.all(
-      (sortedData ?? []).map(async (item: any) => {
-        const { data: exercise } = await supabase
-          .from("exercises")
-          .select("*")
-          .eq("id", item.exercise_id ?? item.exerciseId)
-          .limit(1);
+      const full = await Promise.all(
+        sortedData.map(async (item) => {
+          const { data: rawExercise, error } = await supabase
+            .from("exercises")
+            .select("*")
+            .eq("id", item.exercise_id ?? item.exerciseId)
+            .single();
 
-        return {
-          ...item,
-          exercise: exercise && exercise[0] ? exercise[0] : null,
-        };
-      }),
-    );
+          if (error) throw error;
+          const exercise = rawExercise as ExerciseSummary | null;
+          return { ...item, exercise };
+        }),
+      );
 
-    setExercises(full);
-  }
-
-  useEffect(() => {
-    load();
+      setExercises(full);
+    } catch (error) {
+      console.error("Erreur chargement séance :", error);
+      setErrorMessage("Impossible de charger cette séance. Réessaie quand la connexion sera rétablie.");
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
   useEffect(() => {
-    if (showAdd) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "auto";
-    }
+    // This route effect owns the loading and error state for its remote reads.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
 
+  useEffect(() => {
+    document.body.style.overflow = showAdd ? "hidden" : "";
     return () => {
-      document.body.style.overflow = "auto";
+      document.body.style.overflow = "";
     };
   }, [showAdd]);
 
-  async function deleteExercise(workoutExerciseId: number) {
-    const confirmed = window.confirm(
-      "Supprimer cet exercice de la séance ? Cette action est irréversible.",
-    );
-
-    if (!confirmed) {
-      return;
-    }
+  async function deleteExercise(workoutExerciseId: string | number) {
+    const confirmed = window.confirm("Retirer cet exercice de la séance ?");
+    if (!confirmed) return;
 
     setErrorMessage(null);
-
     const { error: deleteError } = await supabase
       .from("workout_exercises")
       .delete()
       .eq("id", workoutExerciseId);
 
     if (deleteError) {
-      setErrorMessage("Impossible de supprimer cet exercice.");
+      setErrorMessage("Impossible de retirer cet exercice. Vérifie ta connexion puis réessaie.");
       return;
     }
 
     const remaining = exercises.filter((item) => item.id !== workoutExerciseId);
-
-    const results = await Promise.all(remaining.map((item, position) =>
-      supabase
-        .from("workout_exercises")
-        .update({ order: position, order_index: position })
-        .eq("id", item.id),
-    ));
+    const results = await Promise.all(
+      remaining.map((item, position) =>
+        supabase
+          .from("workout_exercises")
+          .update({ order: position, order_index: position })
+          .eq("id", item.id),
+      ),
+    );
 
     if (results.some((result) => result.error)) {
-      setErrorMessage("L'exercice a été supprimé, mais l'ordre n'a pas pu être enregistré.");
-      return;
+      setErrorMessage("L’exercice a été retiré, mais son nouvel ordre n’a pas pu être enregistré.");
     }
 
-    load();
+    await load();
   }
 
-  function updateExercise(exerciseId: number, field: string, value: any) {
-    setExercises(
-      exercises.map((item) =>
-        item.id === exerciseId
-          ? {
-              ...item,
-              [field]: value,
-            }
-          : item,
+  function updateExercise(exerciseId: string | number, field: "sets" | "reps" | "weight", value: string) {
+    setExercises((previous) =>
+      previous.map((item) =>
+        item.id === exerciseId ? { ...item, [field]: value } : item,
       ),
     );
   }
 
   function moveExercise(index: number, direction: number) {
-    const newExercises = [...exercises];
+    setExercises((previous) => {
+      const next = [...previous];
+      const target = index + direction;
+      if (target < 0 || target >= next.length) return previous;
 
-    const target = index + direction;
-
-    if (target < 0 || target >= newExercises.length) {
-      return;
-    }
-
-    [newExercises[index], newExercises[target]] = [
-      newExercises[target],
-      newExercises[index],
-    ];
-
-    setExercises(newExercises.map((exercise, position) => ({
-      ...exercise,
-      order: position,
-      order_index: position,
-    })));
+      [next[index], next[target]] = [next[target], next[index]];
+      return next.map((exercise, position) => ({
+        ...exercise,
+        order: position,
+        order_index: position,
+      }));
+    });
   }
 
   async function save() {
+    if (!id || !workout) return;
+    if (!workout.name?.trim()) {
+      setErrorMessage("Donne un nom à ta séance avant de l’enregistrer.");
+      return;
+    }
+    if (exercises.some((item) => Number(item.sets) < 1 || !String(item.reps ?? "").trim() || Number(item.weight) < 0)) {
+      setErrorMessage("Vérifie les séries, les répétitions et la charge de chaque exercice.");
+      return;
+    }
+
     setSaving(true);
     setErrorMessage(null);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Utilisateur non authentifié");
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUserId = session?.user.id;
+      if (!currentUserId) throw new Error("Reconnecte-toi pour enregistrer cette séance.");
+
+      await updateWorkout(id, {
+        name: workout.name.trim(),
+        day_of_week: Number(workout.day_of_week),
+        description: workout.description ?? "",
+      });
 
       const { data: savedExercises, error: readError } = await supabase
         .from("workout_exercises")
@@ -164,209 +200,158 @@ export default function WorkoutEdit() {
         .eq("workout_id", id);
 
       if (readError) throw readError;
-      const savedById = new Map((savedExercises ?? []).map((item) => [item.id, item]));
+      const savedRows = (savedExercises ?? []) as SavedWorkoutExercise[];
+      const savedById = new Map<string | number, SavedWorkoutExercise>(
+        savedRows.map((item) => [item.id, item]),
+      );
 
-      await Promise.all(exercises.map(async (item, position) => {
-        const old = savedById.get(item.id);
-        const { error } = await supabase
-          .from("workout_exercises")
-          .update({ sets: Number(item.sets), reps: item.reps, weight: Number(item.weight), order: position, order_index: position })
-          .eq("id", item.id);
-        if (error) throw error;
+      await Promise.all(
+        exercises.map(async (item, position) => {
+          const old = savedById.get(item.id);
+          const { error } = await supabase
+            .from("workout_exercises")
+            .update({
+              sets: Number(item.sets),
+              reps: String(item.reps).trim(),
+              weight: Number(item.weight),
+              order: position,
+              order_index: position,
+            })
+            .eq("id", item.id);
 
-        if (old && Number(old.weight) !== Number(item.weight)) {
-          const { error: historyError } = await supabase.from("weight_history").insert({
-            user_id: user.id,
-            exercise_id: old.exercise_id,
-            old_weight: old.weight,
-            new_weight: Number(item.weight),
-            date: new Date().toISOString(),
-          });
-          if (historyError) throw historyError;
-        }
-      }));
+          if (error) throw error;
 
+          if (old && Number(old.weight) !== Number(item.weight)) {
+            const { error: historyError } = await supabase
+              .from("weight_history")
+              .insert({
+                user_id: currentUserId,
+                exercise_id: old.exercise_id,
+                old_weight: old.weight,
+                new_weight: Number(item.weight),
+                date: new Date().toISOString(),
+              });
+
+            if (historyError) throw historyError;
+          }
+        }),
+      );
       navigate(-1);
     } catch (error: unknown) {
       console.error("Erreur sauvegarde séance :", error);
-      setErrorMessage(error instanceof Error ? error.message : "La séance n'a pas pu être enregistrée.");
+      setErrorMessage(
+        error instanceof Error
+          ? `Enregistrement interrompu : ${error.message}`
+          : "La séance n’a pas pu être enregistrée. Réessaie quand la connexion sera rétablie.",
+      );
     } finally {
       setSaving(false);
     }
   }
 
+  if (loading) return <div className="text-neutral-400">Chargement de la séance…</div>;
+  if (!workout) return <div role="alert" className="text-red-400">{errorMessage ?? "Séance introuvable."}</div>;
+
   return (
     <div>
       <button
+        type="button"
         onClick={() => navigate(-1)}
-        className="
-  mb-5
-  bg-neutral-800
-  rounded-2xl
-  px-5
-  py-3
-  font-semibold
-  "
+        className="mb-5 rounded-2xl bg-neutral-800 px-5 py-3 font-semibold"
       >
         ← Retour
       </button>
 
-      <h1
-        className="
-        text-3xl
-        font-bold
-        mt-6
-        "
-      >
-        Modifier {workout?.name}
-      </h1>
+      <p className="session-kicker">Programme hebdomadaire</p>
+      <h1>Modifier la séance</h1>
+
+      <section className="mt-6 rounded-3xl bg-neutral-900 p-5">
+        <label className="mb-4 block">
+          <span className="mb-2 block text-sm font-semibold text-neutral-400">Nom de la séance</span>
+          <input
+            value={workout.name ?? ""}
+            onChange={(event) => setWorkout((previous) => previous ? { ...previous, name: event.target.value } : previous)}
+            className="w-full rounded-xl bg-neutral-800 p-3"
+            placeholder="Ex. Haut du corps"
+          />
+        </label>
+
+        <label className="mb-4 block">
+          <span className="mb-2 block text-sm font-semibold text-neutral-400">Jour de référence</span>
+          <select
+            value={workout.day_of_week ?? 1}
+            onChange={(event) => setWorkout((previous) => previous ? { ...previous, day_of_week: Number(event.target.value) } : previous)}
+            className="w-full rounded-xl bg-neutral-800 p-3"
+          >
+            {DAYS.map((day) => <option key={day.value} value={day.value}>{day.label}</option>)}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-neutral-400">Description</span>
+          <textarea
+            value={workout.description ?? ""}
+            onChange={(event) => setWorkout((previous) => previous ? { ...previous, description: event.target.value } : previous)}
+            className="min-h-24 w-full rounded-xl bg-neutral-800 p-3"
+            placeholder="Quelques notes pour cette séance"
+          />
+        </label>
+      </section>
 
       <button
+        type="button"
         onClick={() => setShowAdd(true)}
-        className="
-        mt-6
-        w-full
-        bg-white
-        text-black
-        rounded-2xl
-        py-4
-        font-semibold
-        "
+        className="mt-5 w-full rounded-2xl bg-white py-4 font-semibold"
       >
         + Ajouter un exercice
       </button>
 
-      <div
-        className="
-        mt-8
-        space-y-4
-        "
-      >
+      <div className="mt-6 space-y-4">
         {exercises.map((item, index) => (
-          <div
-            key={item.id}
-            className="
-            bg-neutral-900
-            rounded-3xl
-            p-5
-            "
-          >
-            <div
-              className="
-              flex
-              justify-between
-              items-center
-              "
-            >
-              <h2
-                className="
-                font-bold
-                text-lg
-                "
-              >
-                {index + 1}. {item.exercise?.name}
-              </h2>
-
+          <section key={item.id} className="rounded-3xl bg-neutral-900 p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold text-neutral-500">EXERCICE {String(index + 1).padStart(2, "0")}</p>
+                <h2 className="mt-1 text-lg font-bold">{item.exercise?.name ?? "Exercice"}</h2>
+              </div>
               <div className="flex gap-2">
-                <button
-                  onClick={() => moveExercise(index, -1)}
-                  className="
-                  bg-neutral-800
-                  px-3
-                  py-2
-                  rounded-xl
-                  "
-                >
-                  ↑
-                </button>
-
-                <button
-                  onClick={() => moveExercise(index, 1)}
-                  className="
-                  bg-neutral-800
-                  px-3
-                  py-2
-                  rounded-xl
-                  "
-                >
-                  ↓
-                </button>
+                <button type="button" aria-label={`Monter ${item.exercise?.name}`} onClick={() => moveExercise(index, -1)} className="rounded-xl bg-neutral-800 px-3 py-2">↑</button>
+                <button type="button" aria-label={`Descendre ${item.exercise?.name}`} onClick={() => moveExercise(index, 1)} className="rounded-xl bg-neutral-800 px-3 py-2">↓</button>
               </div>
             </div>
 
-            <div className="mt-4 space-y-3">
-              <input
-                type="number"
-                value={item.sets}
-                onChange={(e) =>
-                  updateExercise(item.id, "sets", Number(e.target.value))
-                }
-                className="
-                w-full
-                bg-neutral-800
-                rounded-xl
-                p-3
-                "
-              />
-
-              <input
-                value={item.reps}
-                onChange={(e) =>
-                  updateExercise(item.id, "reps", e.target.value)
-                }
-                className="
-                w-full
-                bg-neutral-800
-                rounded-xl
-                p-3
-                "
-              />
-
-              <input
-                type="number"
-                value={item.weight}
-                onChange={(e) =>
-                  updateExercise(item.id, "weight", Number(e.target.value))
-                }
-                className="
-                w-full
-                bg-neutral-800
-                rounded-xl
-                p-3
-                "
-              />
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <label>
+                <span className="mb-2 block text-xs font-semibold text-neutral-400">Séries</span>
+                <input type="number" min="1" value={item.sets} onChange={(event) => updateExercise(item.id, "sets", event.target.value)} className="w-full rounded-xl bg-neutral-800 p-3" />
+              </label>
+              <label>
+                <span className="mb-2 block text-xs font-semibold text-neutral-400">Répétitions cibles</span>
+                <input value={item.reps} onChange={(event) => updateExercise(item.id, "reps", event.target.value)} className="w-full rounded-xl bg-neutral-800 p-3" placeholder="10–12" />
+              </label>
+              <label>
+                <span className="mb-2 block text-xs font-semibold text-neutral-400">Charge de départ (kg)</span>
+                <input type="number" min="0" step="0.5" value={item.weight} onChange={(event) => updateExercise(item.id, "weight", event.target.value)} className="w-full rounded-xl bg-neutral-800 p-3" />
+              </label>
             </div>
 
-            <button
-              onClick={() => deleteExercise(item.id)}
-              className="
-              mt-4
-              text-red-400
-              "
-            >
-              Supprimer
+            <button type="button" onClick={() => void deleteExercise(item.id)} className="mt-4 text-sm font-semibold text-red-400">
+              Retirer l’exercice
             </button>
-          </div>
+          </section>
         ))}
       </div>
 
-      <button
-        onClick={save}
-        disabled={saving}
-        className="
-        mt-8
-        w-full
-        bg-white
-        text-black
-        rounded-2xl
-        py-4
-        font-semibold
-        "
-      >
-        {saving ? "Enregistrement..." : "Enregistrer les modifications"}
-      </button>
+      {errorMessage && <p role="alert" className="mt-4 text-sm text-red-400">{errorMessage}</p>}
 
-      {errorMessage && <p className="mt-4 text-red-400">{errorMessage}</p>}
+      <button
+        type="button"
+        onClick={() => void save()}
+        disabled={saving}
+        className="mt-7 w-full rounded-2xl bg-white py-4 font-semibold disabled:opacity-55"
+      >
+        {saving ? "Enregistrement…" : "Enregistrer les modifications"}
+      </button>
 
       {showAdd && (
         <ExerciseFormModal
@@ -374,7 +359,7 @@ export default function WorkoutEdit() {
           workoutId={id}
           order={exercises.length}
           onClose={() => setShowAdd(false)}
-          onCreated={() => load()}
+          onCreated={() => void load()}
         />
       )}
     </div>

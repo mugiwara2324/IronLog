@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { supabase } from "../../lib/supabase";
+import { cancelActiveWorkout } from "../../services/activeWorkoutService";
 
 type SetEntry = {
   weight: number | string;
@@ -146,6 +147,7 @@ export default function WorkoutActive() {
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [finishing, setFinishing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("saved");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
@@ -672,6 +674,57 @@ export default function WorkoutActive() {
     }
   }
 
+  async function abandonWorkout() {
+    if (!id || !userId || cancelling) return;
+
+    // Guard the action itself as well as the disabled UI: once a set is
+    // validated, the workout must be completed instead of cancelled.
+    const hasValidatedSet = latestExercises.current.some((exercise) =>
+      exercise.sets.some((set) => set.completed),
+    );
+    if (hasValidatedSet) return;
+
+    const confirmed = window.confirm(
+      "Annuler cette séance en cours ? Les séries saisies seront supprimées et la séance ne sera pas ajoutée à l’historique.",
+    );
+    if (!confirmed) return;
+
+    setCancelling(true);
+    setErrorMessage(null);
+    if (saveTimer.current !== null) {
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    if (retryTimer.current !== null) {
+      window.clearTimeout(retryTimer.current);
+      retryTimer.current = null;
+    }
+
+    // Invalidate queued autosaves, then wait for an in-flight request before deleting server rows.
+    revision.current += 1;
+    try {
+      await saveQueue.current.catch(() => undefined);
+      const removedOnline = await cancelActiveWorkout(userId, id);
+      if (currentCacheKey.current) {
+        try {
+          localStorage.removeItem(currentCacheKey.current);
+        } catch (error) {
+          console.warn("Impossible de supprimer le brouillon local :", error);
+        }
+      }
+      latestExercises.current = [];
+      setExercises([]);
+      if (!removedOnline) {
+        console.info("La suppression de la séance sera retentée dès le retour en ligne.");
+      }
+      navigate("/");
+    } catch (error) {
+      console.error("Erreur annulation séance :", error);
+      setErrorMessage("La séance n’a pas pu être annulée. Réessaie quand la connexion sera rétablie.");
+      setCancelling(false);
+    }
+  }
+
   if (loading) return <div className="text-neutral-400">Chargement de ta séance…</div>;
 
   const totalSets = exercises.reduce((total, item) => total + item.sets.length, 0);
@@ -707,6 +760,21 @@ export default function WorkoutActive() {
           <span>{syncLabel}</span>
         </div>
       </header>
+
+      <button
+        type="button"
+        onClick={() => void abandonWorkout()}
+        disabled={finishing || cancelling || completedSets > 0}
+        className="mt-4 text-sm font-semibold text-neutral-400 underline decoration-neutral-600 underline-offset-4 disabled:opacity-50"
+        aria-describedby={completedSets > 0 ? "cancel-workout-hint" : undefined}
+      >
+        {cancelling ? "Annulation de la séance…" : completedSets > 0 ? "Annulation indisponible" : "Annuler cette séance"}
+      </button>
+      {completedSets > 0 && (
+        <p id="cancel-workout-hint" className="mt-2 text-xs text-neutral-500">
+          Une série a déjà été validée. Termine la séance pour conserver tes résultats.
+        </p>
+      )}
 
       <section className="session-summary" aria-label="Progression de la séance">
         <div className="session-summary-top">
@@ -809,7 +877,7 @@ export default function WorkoutActive() {
         <button
           type="button"
           onClick={() => void saveCurrentState()}
-          disabled={!navigator.onLine || finishing}
+          disabled={!navigator.onLine || finishing || cancelling}
           className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-neutral-800 py-3 text-sm font-semibold disabled:opacity-50"
         >
           <RefreshCw size={16} aria-hidden="true" /> Réessayer la synchronisation
@@ -819,7 +887,7 @@ export default function WorkoutActive() {
       <button
         type="button"
         onClick={() => void finishWorkout()}
-        disabled={!allDone || finishing || syncStatus !== "saved"}
+        disabled={!allDone || finishing || cancelling || syncStatus !== "saved"}
         className="finish-workout-button w-full rounded-2xl bg-white py-4 font-semibold disabled:opacity-40"
       >
         {finishing ? "Enregistrement de la séance…" : allDone ? "Terminer la séance" : "Valide toutes les séries"}

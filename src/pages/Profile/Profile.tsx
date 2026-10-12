@@ -1,13 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { getProfile } from "../../services/profileService";
 import { getBodyMeasurements } from "../../services/bodyService";
 
 import CreateProfile from "../../components/Profile/CreateProfile";
 import EditProfile from "../../components/Profile/EditProfile";
+import { createProgramArchive, importProgramArchive, parseProgramArchive, programArchiveToCsv } from "../../services/programArchiveService";
 
 export default function Profile() {
   const [profile, setProfile] = useState<any>(null);
+  const [archiveBusy, setArchiveBusy] = useState(false);
+  const [archiveMessage, setArchiveMessage] = useState<string | null>(null);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   const [showCreate, setShowCreate] = useState(false);
 
@@ -156,6 +161,33 @@ export default function Profile() {
   useEffect(() => {
     load();
   }, []);
+
+  async function exportProgram(format: "json" | "csv") {
+    setArchiveBusy(true); setArchiveMessage(null); setArchiveError(null);
+    try {
+      const archive = await createProgramArchive();
+      const content = format === "json" ? JSON.stringify(archive, null, 2) : `\uFEFF${programArchiveToCsv(archive)}`;
+      const mimeType = format === "json" ? "application/json;charset=utf-8" : "text/csv;charset=utf-8";
+      const url = URL.createObjectURL(new Blob([content], { type: mimeType }));
+      const link = document.createElement("a"); link.href = url;
+      link.download = `ironlog-programme-${new Date().toISOString().slice(0, 10)}.${format}`;
+      link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setArchiveMessage(`Export terminé : ${archive.programs.length} séance(s) du programme.`);
+    } catch (error) { setArchiveError(error instanceof Error ? error.message : "Impossible d’exporter le programme."); }
+    finally { setArchiveBusy(false); }
+  }
+
+  async function importProgramFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]; if (!file) return;
+    setArchiveBusy(true); setArchiveMessage(null); setArchiveError(null);
+    try {
+      const archive = parseProgramArchive(await file.text(), file.name);
+      if (!window.confirm(`Importer ${archive.programs.length} séance(s) programmée(s) et leurs exercices ?\n\nAucune donnée d’historique ne sera importée. Les séances et exercices déjà présents seront ignorés.`)) return;
+      const summary = await importProgramArchive(archive);
+      setArchiveMessage(`Import terminé : ${summary.programsAdded} séance(s) ajoutée(s), ${summary.exercisesAdded} exercice(s) ajouté(s), ${summary.exercisesSkipped} déjà présent(s).`);
+    } catch (error) { setArchiveError(error instanceof Error ? error.message : "Impossible d’importer ce programme."); }
+    finally { setArchiveBusy(false); event.target.value = ""; }
+  }
 
   function formatEvolution(value: number | null) {
     if (value === null) {
@@ -508,6 +540,19 @@ export default function Profile() {
           />
         </div>
       </div>
+
+      <details className="mt-6 rounded-2xl border border-white/10 bg-neutral-900/70 px-5 py-4">
+        <summary className="cursor-pointer text-sm font-semibold text-neutral-200">Importer / exporter mon programme</summary>
+        <p className="mt-3 text-sm text-neutral-400">Sauvegarde ou réutilise tes séances programmées et leurs exercices. L’historique d’entraînement n’est pas inclus.</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" onClick={() => void exportProgram("json")} disabled={archiveBusy} className="rounded-xl bg-neutral-800 px-3 py-2 text-sm font-medium disabled:opacity-50">Exporter JSON</button>
+          <button type="button" onClick={() => void exportProgram("csv")} disabled={archiveBusy} className="rounded-xl bg-neutral-800 px-3 py-2 text-sm font-medium disabled:opacity-50">Exporter CSV</button>
+          <button type="button" onClick={() => importFileRef.current?.click()} disabled={archiveBusy} className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-black disabled:opacity-50">{archiveBusy ? "Traitement…" : "Importer JSON ou CSV"}</button>
+          <input ref={importFileRef} type="file" accept=".json,.csv,application/json,text/csv" className="hidden" onChange={(event) => void importProgramFile(event)} aria-label="Choisir un export de programme JSON ou CSV" />
+        </div>
+        {archiveMessage && <p role="status" className="mt-3 text-sm text-lime-300">{archiveMessage}</p>}
+        {archiveError && <p role="alert" className="mt-3 text-sm text-red-400">{archiveError}</p>}
+      </details>
 
       {showEdit && (
         <EditProfile

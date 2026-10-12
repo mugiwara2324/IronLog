@@ -9,6 +9,7 @@ import {
   WEEK_DAYS,
 } from "../../services/workoutService";
 import { supabase } from "../../lib/supabase";
+import { syncPendingActiveWorkoutCancellations } from "../../services/activeWorkoutService";
 
 type CompletedSession = {
   id: string;
@@ -43,6 +44,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [startingWorkoutId, setStartingWorkoutId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [cancellationPending, setCancellationPending] = useState(false);
 
   async function load() {
     try {
@@ -53,6 +55,8 @@ export default function Home() {
       if (!user) {
         throw new Error("Utilisateur non authentifié");
       }
+
+      const pendingCancellations = await syncPendingActiveWorkoutCancellations(user.id);
 
       const [weeklyPlan, activeResult, sessionsResult] = await Promise.all([
         getWeeklyWorkoutPlan(),
@@ -77,8 +81,9 @@ export default function Home() {
       if (sessionsResult.error) throw sessionsResult.error;
 
       setWorkouts(weeklyPlan);
-      setActiveWorkoutId(activeResult.data?.workout_id ?? null);
+      setActiveWorkoutId(pendingCancellations > 0 ? null : activeResult.data?.workout_id ?? null);
       setCompletedSessions((sessionsResult.data ?? []) as CompletedSession[]);
+      setCancellationPending(pendingCancellations > 0);
     } catch (error) {
       console.error("Erreur chargement accueil :", error);
       setErrorMessage("Impossible de charger tes séances.");
@@ -91,6 +96,9 @@ export default function Home() {
     // Loading the authenticated home screen is the effect's external data sync.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
+    const handleOnline = () => void load();
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
   }, []);
 
   async function startWorkout(workout: WorkoutTemplate) {
@@ -110,6 +118,11 @@ export default function Home() {
 
       if (!user) throw new Error("Utilisateur non authentifié");
 
+      const pendingCancellations = await syncPendingActiveWorkoutCancellations(user.id);
+      if (pendingCancellations > 0) {
+        throw new Error("La suppression de la séance précédente est en attente. Réessaie dans un instant.");
+      }
+
       if (activeWorkoutId === workout.id) {
         navigate(`/workout-active/${workout.id}`);
         return;
@@ -126,10 +139,11 @@ export default function Home() {
       }
 
       // Une seule séance active à la fois : on remplace celle qui n'a pas été terminée.
-      await supabase
+      const { error: deleteExercisesError } = await supabase
         .from("active_workout_exercises")
         .delete()
         .eq("user_id", user.id);
+      if (deleteExercisesError) throw deleteExercisesError;
 
       const { error: deleteActiveError } = await supabase
         .from("active_workout")
@@ -137,6 +151,14 @@ export default function Home() {
         .eq("user_id", user.id);
 
       if (deleteActiveError) throw deleteActiveError;
+
+      if (activeWorkoutId) {
+        try {
+          localStorage.removeItem(`ironlog:active-workout:${user.id}:${activeWorkoutId}`);
+        } catch (error) {
+          console.warn("Impossible de nettoyer l’ancien brouillon local :", error);
+        }
+      }
 
       const { error: activeError } = await supabase.from("active_workout").insert({
         user_id: user.id,
@@ -198,6 +220,12 @@ export default function Home() {
           >
             Reprendre ma séance en cours
           </button>
+        )}
+
+        {cancellationPending && (
+          <p role="status" className="mt-4 rounded-2xl bg-amber-400/10 p-4 text-sm text-amber-200">
+            La séance est annulée sur cet appareil. Sa suppression en ligne sera retentée dès que la connexion sera rétablie.
+          </p>
         )}
 
         <div className="mt-5 space-y-3">

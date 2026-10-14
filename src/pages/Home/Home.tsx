@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ArrowRight, CalendarDays, Check, Dumbbell, Play, RefreshCw, Trash2 } from "lucide-react";
 
 import {
   getCurrentDayOfWeek,
@@ -9,7 +10,7 @@ import {
   WEEK_DAYS,
 } from "../../services/workoutService";
 import { supabase } from "../../lib/supabase";
-import { syncPendingActiveWorkoutCancellations } from "../../services/activeWorkoutService";
+import { cancelActiveWorkout, syncPendingActiveWorkoutCancellations } from "../../services/activeWorkoutService";
 import { getInitialReps } from "../../utils/reps";
 
 type CompletedSession = {
@@ -19,64 +20,89 @@ type CompletedSession = {
   workouts?: { name?: string | null } | null;
 };
 
+type ActiveWorkoutOverview = {
+  workoutId: string;
+  totalSets: number;
+  completedSets: number;
+  canCancel: boolean;
+};
+
 function getStartOfCurrentWeek() {
   const date = new Date();
   const day = date.getDay() || 7;
-
   date.setDate(date.getDate() - day + 1);
   date.setHours(0, 0, 0, 0);
-
   return date.toISOString();
+}
+
+function getSessionDay(date: string) {
+  const day = new Date(date).getDay();
+  return day === 0 ? 7 : day;
 }
 
 export default function Home() {
   const navigate = useNavigate();
   const [workouts, setWorkouts] = useState<WorkoutTemplate[]>([]);
   const [completedSessions, setCompletedSessions] = useState<CompletedSession[]>([]);
-  const [activeWorkoutId, setActiveWorkoutId] = useState<string | null>(null);
+  const [activeWorkout, setActiveWorkout] = useState<ActiveWorkoutOverview | null>(null);
+  const [selectedWorkoutId, setSelectedWorkoutId] = useState("");
   const [loading, setLoading] = useState(true);
-  const [startingWorkoutId, setStartingWorkoutId] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [cancellationPending, setCancellationPending] = useState(false);
 
   async function load() {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        throw new Error("Utilisateur non authentifié");
-      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Utilisateur non authentifié");
 
       const pendingCancellations = await syncPendingActiveWorkoutCancellations(user.id);
-
       const [weeklyPlan, activeResult, sessionsResult] = await Promise.all([
         getWeeklyWorkoutPlan(),
-        supabase
-          .from("active_workout")
-          .select("workout_id")
-          .eq("user_id", user.id)
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from("workout_sessions")
+        supabase.from("active_workout").select("workout_id")
+          .eq("user_id", user.id).order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("workout_sessions")
           .select("id, workout_id, finished_at, workouts(name)")
-          .eq("user_id", user.id)
-          .not("finished_at", "is", null)
+          .eq("user_id", user.id).not("finished_at", "is", null)
           .gte("finished_at", getStartOfCurrentWeek())
-          .order("finished_at", { ascending: false })
-          .limit(20),
+          .order("finished_at", { ascending: false }).limit(50),
       ]);
 
       if (activeResult.error) throw activeResult.error;
       if (sessionsResult.error) throw sessionsResult.error;
 
+      const history = (sessionsResult.data ?? []) as CompletedSession[];
       setWorkouts(weeklyPlan);
-      setActiveWorkoutId(pendingCancellations > 0 ? null : activeResult.data?.workout_id ?? null);
-      setCompletedSessions((sessionsResult.data ?? []) as CompletedSession[]);
+      setCompletedSessions(history);
       setCancellationPending(pendingCancellations > 0);
+
+      const plannedToday = weeklyPlan.find((workout) => workout.day_of_week === getCurrentDayOfWeek());
+      setSelectedWorkoutId((current) => plannedToday
+        ? weeklyPlan.some((workout) => workout.id === current) ? current : plannedToday.id
+        : "");
+
+      const activeWorkoutId = pendingCancellations === 0 ? activeResult.data?.workout_id : null;
+      if (!activeWorkoutId) {
+        setActiveWorkout(null);
+      } else {
+        const { data: activeExercises, error: activeExercisesError } = await supabase
+          .from("active_workout_exercises").select("sets, done")
+          .eq("user_id", user.id).eq("workout_id", activeWorkoutId);
+        if (activeExercisesError) throw activeExercisesError;
+
+        const sets = (activeExercises ?? []).flatMap((exercise) =>
+          Array.isArray(exercise.sets) ? exercise.sets as Array<{ completed?: boolean }> : [],
+        );
+        const completedSets = sets.filter((set) => set.completed).length;
+        const hasCompletedExercise = (activeExercises ?? []).some((exercise) => exercise.done);
+        setActiveWorkout({
+          workoutId: activeWorkoutId,
+          totalSets: sets.length,
+          completedSets,
+          canCancel: completedSets === 0 && !hasCompletedExercise,
+        });
+      }
     } catch (error) {
       console.error("Erreur chargement accueil :", error);
       setErrorMessage("Impossible de charger tes séances.");
@@ -88,48 +114,49 @@ export default function Home() {
   useEffect(() => {
     // Loading the authenticated home screen is the effect's external data sync.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
+    void load();
     const handleOnline = () => void load();
     window.addEventListener("online", handleOnline);
     return () => window.removeEventListener("online", handleOnline);
   }, []);
 
-  async function startWorkout(workout: WorkoutTemplate) {
-    const confirmed = window.confirm(
-      `Commencer la séance « ${workout.name} » ?\n\nToute séance en cours sera remplacée.`,
-    );
+  async function startWorkout() {
+    if (starting || activeWorkout || cancellationPending) return;
+    const workout = workouts.find((item) => item.id === selectedWorkoutId);
+    if (!workout) {
+      setErrorMessage("Choisis une séance avant de la lancer.");
+      return;
+    }
 
-    if (!confirmed) return;
-
-    setStartingWorkoutId(workout.id);
+    setStarting(true);
     setErrorMessage(null);
-
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Utilisateur non authentifié");
+
+      // Recheck the server so a second tab cannot accidentally replace an active workout.
+      const { data: existingActive, error: existingActiveError } = await supabase
+        .from("active_workout").select("workout_id").eq("user_id", user.id)
+        .order("updated_at", { ascending: false }).limit(1).maybeSingle();
+      if (existingActiveError) throw existingActiveError;
+      if (existingActive?.workout_id) {
+        await load();
+        setErrorMessage("Une séance est déjà en cours. Termine-la ou annule-la avant d’en démarrer une autre.");
+        return;
+      }
 
       const pendingCancellations = await syncPendingActiveWorkoutCancellations(user.id);
       if (pendingCancellations > 0) {
-        throw new Error("La suppression de la séance précédente est en attente. Réessaie dans un instant.");
-      }
-
-      if (activeWorkoutId === workout.id) {
-        navigate(`/workout-active/${workout.id}`);
-        return;
+        setCancellationPending(true);
+        throw new Error("L’annulation précédente attend une connexion pour se synchroniser.");
       }
 
       const { data: workoutExercises, error: exercisesError } = await supabase
         .from("workout_exercises")
         .select("exercise_id, sets, reps, weight, order, order_index")
         .eq("workout_id", workout.id);
-
       if (exercisesError) throw exercisesError;
-      if (!workoutExercises?.length) {
-        throw new Error("Cette séance ne contient aucun exercice.");
-      }
+      if (!workoutExercises?.length) throw new Error("Cette séance ne contient aucun exercice.");
 
       const { error: activeError } = await supabase.from("active_workout").insert({
         user_id: user.id,
@@ -137,42 +164,27 @@ export default function Home() {
         started_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });
-
       if (activeError) throw activeError;
 
       const activeExercises = [...workoutExercises]
         .sort((a, b) => Number(a.order ?? a.order_index ?? 0) - Number(b.order ?? b.order_index ?? 0))
         .map((exercise, index) => ({
-        user_id: user.id,
-        workout_id: workout.id,
-        exercise_id: exercise.exercise_id,
-        order: exercise.order ?? exercise.order_index ?? index + 1,
-        done: false,
-        sets: Array.from({ length: exercise.sets }, () => ({
-          weight: exercise.weight,
-          reps: getInitialReps(exercise.reps),
-        })),
-      }));
+          user_id: user.id,
+          workout_id: workout.id,
+          exercise_id: exercise.exercise_id,
+          order: exercise.order ?? exercise.order_index ?? index + 1,
+          done: false,
+          sets: Array.from({ length: exercise.sets }, () => ({
+            weight: exercise.weight,
+            reps: getInitialReps(exercise.reps),
+          })),
+        }));
 
       const { error: insertExercisesError } = await supabase
-        .from("active_workout_exercises")
-        .insert(activeExercises);
-
+        .from("active_workout_exercises").insert(activeExercises);
       if (insertExercisesError) {
-        // Roll back only the newly created attempt; keep the previous workout intact.
         await supabase.from("active_workout").delete().eq("user_id", user.id).eq("workout_id", workout.id);
         throw insertExercisesError;
-      }
-
-      // The new workout is now fully created. Remove the previous one afterward.
-      const { error: deleteExercisesError } = await supabase
-        .from("active_workout_exercises").delete().eq("user_id", user.id).neq("workout_id", workout.id);
-      if (deleteExercisesError) console.warn("Ancienne séance conservée après démarrage :", deleteExercisesError);
-      const { error: deleteActiveError } = await supabase
-        .from("active_workout").delete().eq("user_id", user.id).neq("workout_id", workout.id);
-      if (deleteActiveError) console.warn("Ancienne séance conservée après démarrage :", deleteActiveError);
-      if (activeWorkoutId) {
-        try { localStorage.removeItem(`ironlog:active-workout:${user.id}:${activeWorkoutId}`); } catch { /* Cache facultatif */ }
       }
 
       navigate(`/workout-active/${workout.id}`);
@@ -180,86 +192,150 @@ export default function Home() {
       console.error("Erreur démarrage séance :", error);
       setErrorMessage(error instanceof Error ? error.message : "Erreur au démarrage de la séance.");
     } finally {
-      setStartingWorkoutId(null);
+      setStarting(false);
     }
   }
 
-  if (loading) return <div>Chargement...</div>;
+  async function cancelWorkout() {
+    if (!activeWorkout || !activeWorkout.canCancel || cancelling) return;
+    const workoutName = workouts.find((item) => item.id === activeWorkout.workoutId)?.name ?? "cette séance";
+    if (!window.confirm(`Annuler « ${workoutName} » ? La séance ne sera pas ajoutée à l’historique.`)) return;
+
+    setCancelling(true);
+    setErrorMessage(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Utilisateur non authentifié");
+      const removedOnline = await cancelActiveWorkout(user.id, activeWorkout.workoutId);
+      try { localStorage.removeItem(`ironlog:active-workout:${user.id}:${activeWorkout.workoutId}`); } catch { /* cache facultatif */ }
+      setActiveWorkout(null);
+      setCancellationPending(!removedOnline);
+      if (!removedOnline) setErrorMessage("L’annulation est enregistrée sur cet appareil et sera synchronisée dès que possible.");
+    } catch (error) {
+      console.error("Erreur annulation séance :", error);
+      setErrorMessage("La séance n’a pas pu être annulée. Réessaie dans un instant.");
+    } finally {
+      setCancelling(false);
+    }
+  }
+
+  if (loading) return <div role="status" className="text-neutral-400">Chargement de l’accueil…</div>;
 
   const todayDay = getCurrentDayOfWeek();
+  const selectedWorkout = workouts.find((workout) => workout.id === selectedWorkoutId);
+  const plannedDays = WEEK_DAYS.flatMap((day) => {
+    const sessions = workouts.filter((workout) => workout.day_of_week === day.value);
+    return sessions.length ? [{ ...day, sessions }] : [];
+  });
+  const completedThisWeek = completedSessions.length;
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold">Bon retour</h1>
-
-      <section className="mt-8 bg-neutral-900 rounded-3xl p-6">
-        <p className="text-sm text-neutral-400">Aujourd&apos;hui · {getDayName(todayDay)}</p>
-        <h2 className="text-2xl font-bold mt-2">Choisis ta séance</h2>
-        <p className="mt-2 text-neutral-400">
-          Le planning est un repère : tu peux démarrer n&apos;importe quelle séance, n&apos;importe quel jour.
-        </p>
-
-        {activeWorkoutId && (
-          <button
-            onClick={() => navigate(`/workout-active/${activeWorkoutId}`)}
-            className="mt-5 w-full bg-neutral-700 rounded-2xl py-3 font-semibold"
-          >
-            Reprendre ma séance en cours
-          </button>
-        )}
-
-        {cancellationPending && (
-          <p role="status" className="mt-4 rounded-2xl bg-amber-400/10 p-4 text-sm text-amber-200">
-            La séance est annulée sur cet appareil. Sa suppression en ligne sera retentée dès que la connexion sera rétablie.
-          </p>
-        )}
-
-        <div className="mt-5 space-y-3">
-          {workouts.map((workout) => (
-            <button
-              key={workout.id}
-              onClick={() => startWorkout(workout)}
-              disabled={startingWorkoutId !== null}
-              className="w-full text-left bg-neutral-800 rounded-2xl p-4 disabled:opacity-50"
-            >
-              <span className="block font-bold">{workout.name}</span>
-              <span className="block text-sm text-neutral-400 mt-1">
-                Prévue le {getDayName(workout.day_of_week)} · {startingWorkoutId === workout.id ? "Démarrage..." : "Démarrer"}
-              </span>
-            </button>
-          ))}
+    <div className="home-dashboard">
+      <header className="home-welcome">
+        <div>
+          <p className="session-kicker">IRONLOG · TON ESPACE</p>
+          <h1 className="text-3xl font-bold">Bonjour, prêt à t’entraîner ?</h1>
+          <p className="mt-2 text-neutral-400">{getDayName(todayDay)} · {new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}</p>
         </div>
+      </header>
 
-        {workouts.length === 0 && (
-          <button onClick={() => navigate("/workouts")} className="mt-5 w-full bg-white text-black rounded-2xl py-3 font-semibold">
-            Créer ma première séance
+      {activeWorkout ? (
+        <section className="home-active-card" aria-labelledby="active-workout-heading">
+          <div className="home-active-card__title">
+            <div className="home-active-card__identity">
+              <div className="home-card-icon"><Dumbbell size={20} aria-hidden="true" /></div>
+              <h2 id="active-workout-heading">{workouts.find((item) => item.id === activeWorkout.workoutId)?.name ?? "Ta séance"}</h2>
+            </div>
+            <span className="home-status-pill"><span className="home-status-dot" /> En cours</span>
+          </div>
+          <p className="home-card-copy">
+            {activeWorkout.totalSets > 0
+              ? `${activeWorkout.completedSets} série${activeWorkout.completedSets > 1 ? "s" : ""} validée${activeWorkout.completedSets > 1 ? "s" : ""} sur ${activeWorkout.totalSets}`
+              : "Ta séance est prête à reprendre."}
+          </p>
+          {activeWorkout.totalSets > 0 && <div className="home-progress-track" role="progressbar" aria-label="Progression de la séance" aria-valuenow={activeWorkout.completedSets} aria-valuemin={0} aria-valuemax={activeWorkout.totalSets}><span style={{ width: `${Math.round(activeWorkout.completedSets / activeWorkout.totalSets * 100)}%` }} /></div>}
+          <button type="button" onClick={() => navigate(`/workout-active/${activeWorkout.workoutId}`)} className="home-primary-button">
+            <Play size={17} fill="currentColor" aria-hidden="true" /> Reprendre ma séance <ArrowRight size={18} aria-hidden="true" />
           </button>
-        )}
-        {errorMessage && <p className="mt-4 text-red-400">{errorMessage}</p>}
+          {activeWorkout.canCancel ? (
+            <button type="button" onClick={() => void cancelWorkout()} disabled={cancelling} className="home-secondary-button">
+              <Trash2 size={16} aria-hidden="true" /> {cancelling ? "Annulation…" : "Annuler cette séance"}
+            </button>
+          ) : (
+            <p className="home-lock-note"><Check size={15} aria-hidden="true" /> Une série est validée : termine cette séance avant d’en lancer une autre.</p>
+          )}
+        </section>
+      ) : (
+        <section className="home-start-card" aria-labelledby="start-workout-heading">
+          <div className="home-start-card__heading">
+            <div className="home-card-icon"><Play size={20} aria-hidden="true" /></div>
+            <div>
+              <h2 id="start-workout-heading">Commencer une séance</h2>
+            </div>
+          </div>
+
+          {workouts.length > 0 ? (
+            <>
+              <select id="home-workout-select" aria-label="Sélectionnez une séance à lancer" value={selectedWorkoutId} onChange={(event) => setSelectedWorkoutId(event.target.value)} className="home-workout-select" disabled={cancellationPending || starting}>
+                <option value="" disabled>Sélectionnez une séance</option>
+                {workouts.map((workout) => <option key={workout.id} value={workout.id}>{workout.name}{workout.day_of_week === todayDay ? " · prévue aujourd’hui" : ` · ${getDayName(workout.day_of_week)}`}</option>)}
+              </select>
+              {selectedWorkout?.description && <p className="home-card-copy">{selectedWorkout.description}</p>}
+              {!workouts.some((workout) => workout.day_of_week === todayDay) && <p className="home-card-copy">Aucune séance n’est prévue aujourd’hui. Tu peux en choisir une dans ton programme.</p>}
+              {cancellationPending && <p role="status" className="home-pending-note"><RefreshCw size={16} aria-hidden="true" /> L’annulation précédente attend une connexion. Tu pourras lancer une séance après sa synchronisation.</p>}
+              <button type="button" onClick={() => void startWorkout()} disabled={starting || Boolean(activeWorkout) || cancellationPending || !selectedWorkoutId} className="home-primary-button">
+                <Play size={17} fill="currentColor" aria-hidden="true" /> {starting ? "Préparation…" : "Lancer la séance"} <ArrowRight size={18} aria-hidden="true" />
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="home-card-copy">Crée ton programme hebdomadaire pour retrouver ici les séances à lancer.</p>
+              <button type="button" onClick={() => navigate("/workouts")} className="home-primary-button">Créer une séance <ArrowRight size={18} aria-hidden="true" /></button>
+            </>
+          )}
+        </section>
+      )}
+
+      {errorMessage && <p role="alert" className="home-error">{errorMessage}</p>}
+
+      <section className="home-week-overview" aria-label="Résumé de la semaine">
+        <div><span>{plannedDays.reduce((sum, day) => sum + day.sessions.length, 0)}</span><small>séances au programme</small></div>
+        <div><span>{completedThisWeek}</span><small>réalisée{completedThisWeek > 1 ? "s" : ""} cette semaine</small></div>
       </section>
 
-      <section className="mt-8">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-xl font-bold">Mon planning hebdomadaire</h2>
-          <button onClick={() => navigate("/workouts")} className="text-sm text-neutral-400">Modifier</button>
+      <section className="home-weekly-plan" aria-labelledby="weekly-plan-heading">
+        <div className="home-section-heading">
+          <div><p className="home-eyebrow">Organisation</p><h2 id="weekly-plan-heading">Mon planning</h2></div>
+          <button type="button" onClick={() => navigate("/workouts")} className="home-icon-link" aria-label="Ouvrir mes séances" title="Ouvrir mes séances">
+            <CalendarDays size={20} aria-hidden="true" />
+          </button>
         </div>
 
-        <div className="mt-4 space-y-3">
-          {WEEK_DAYS.map((day) => {
-            const planned = workouts.filter((workout) => workout.day_of_week === day.value);
-            const completed = completedSessions.filter((session) => new Date(session.finished_at).getDay() === (day.value === 7 ? 0 : day.value));
-
-            return (
-              <div key={day.value} className={`rounded-2xl p-4 ${day.value === todayDay ? "bg-white text-black" : "bg-neutral-900"}`}>
-                <p className="font-semibold">{day.label}{day.value === todayDay ? " · Aujourd'hui" : ""}</p>
-                {planned.length > 0 ? (
-                  planned.map((workout) => <p key={workout.id} className="mt-1 text-sm opacity-70">Prévu : {workout.name}</p>)
-                ) : <p className="mt-1 text-sm opacity-70">Repos</p>}
-                {completed.map((session) => <p key={session.id} className="mt-2 text-sm font-semibold">✓ Réalisé : {session.workouts?.name ?? "Séance"}</p>)}
-              </div>
-            );
-          })}
-        </div>
+        {plannedDays.length > 0 ? (
+          <div className="home-plan-list">
+            {plannedDays.map((day) => {
+              const completed = completedSessions.filter((session) => getSessionDay(session.finished_at) === day.value);
+              return (
+                <article key={day.value} className={`home-plan-day${day.value === todayDay ? " is-today" : ""}`}>
+                  <div className="home-plan-day__label"><span>{day.label}</span>{day.value === todayDay && <span className="home-today-pill">Aujourd’hui</span>}</div>
+                  <div className="home-plan-day__sessions">
+                    {day.sessions.map((workout) => {
+                      const wasCompleted = completed.some((session) => session.workout_id === workout.id);
+                      return <button key={workout.id} type="button" onClick={() => navigate(`/workouts/${workout.id}`)} className="home-plan-session">
+                        <span className="home-plan-session__mark">{wasCompleted ? <Check size={16} aria-hidden="true" /> : <Dumbbell size={15} aria-hidden="true" />}</span>
+                        <span className="home-plan-session__name">{workout.name}</span>
+                        <span className="home-plan-session__status">{wasCompleted ? "Effectuée" : "Programme"}</span>
+                        <ArrowRight size={16} aria-hidden="true" />
+                      </button>;
+                    })}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="home-empty-plan"><CalendarDays size={21} aria-hidden="true" /><p>Aucune séance au planning pour le moment.</p><button type="button" onClick={() => navigate("/workouts")}>Construire mon programme <ArrowRight size={15} aria-hidden="true" /></button></div>
+        )}
       </section>
     </div>
   );

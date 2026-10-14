@@ -144,6 +144,7 @@ export default function WorkoutActive() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [exercises, setExercises] = useState<ActiveExercise[]>([]);
+  const [workoutName, setWorkoutName] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [finishing, setFinishing] = useState(false);
@@ -184,6 +185,8 @@ export default function WorkoutActive() {
       currentWorkoutId.current = id;
       const key = cacheKey(user.id, id);
       currentCacheKey.current = key;
+      const { data: workoutInfo } = await supabase.from("workouts").select("name").eq("id", id).maybeSingle();
+      setWorkoutName(workoutInfo?.name ?? "");
       const draft = readDraft(key);
       const hasLocalDraft = Boolean(draft && draft.userId === user.id && draft.workoutId === id);
       const useCachedDraft = hasLocalDraft && (draft?.dirty === true || !navigator.onLine);
@@ -756,12 +759,9 @@ export default function WorkoutActive() {
       >
         ← Retour à l’accueil
       </button>
-      <p className="-mt-3 mb-5 text-xs text-neutral-500">Ta séance reste en cours et sera sauvegardée.</p>
       <header className="session-header">
         <div>
-          <p className="session-kicker">Entraînement en cours</p>
-          <h1>Ta séance</h1>
-          <p className="text-sm text-neutral-400">Chaque série validée est sauvegardée au fur et à mesure.</p>
+          <h1>{workoutName || "Séance en cours"}</h1>
         </div>
         <div className={`sync-indicator is-${syncStatus}`} aria-live="polite">
           <SyncIcon size={15} className={syncStatus === "saving" ? "animate-spin" : ""} aria-hidden="true" />
@@ -792,7 +792,7 @@ export default function WorkoutActive() {
         <div className="session-progress-track" role="progressbar" aria-label="Séries validées" aria-valuenow={completedSets} aria-valuemin={0} aria-valuemax={totalSets}>
           <div className="session-progress-fill" style={{ width: `${progress}%` }} />
         </div>
-        <p className="session-summary-caption">{allDone ? "Tout est prêt. Tu peux terminer la séance." : "Valide chaque série pour faire avancer ta séance."}</p>
+        {allDone && <p className="session-summary-caption">Tout est prêt. Tu peux terminer la séance.</p>}
       </section>
 
       {errorMessage && <p role="alert" className="mt-4 rounded-2xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-400">{errorMessage}</p>}
@@ -900,7 +900,6 @@ export default function WorkoutActive() {
       >
         {finishing ? "Enregistrement de la séance…" : allDone ? "Terminer la séance" : "Valide toutes les séries"}
       </button>
-      {!allDone && exercises.length > 0 && <p className="finish-workout-hint">L’exercice se termine automatiquement après sa dernière série.</p>}
     </div>
   );
 }

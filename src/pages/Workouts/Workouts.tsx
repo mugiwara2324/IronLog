@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { ArrowRight } from "lucide-react";
 
 import {
   createWorkout,
@@ -15,10 +16,25 @@ const defaultWorkoutForm = {
   description: "",
 };
 
-export default function Workouts() {
-  const [workouts, setWorkouts] = useState<any[]>([]);
+type WorkoutTemplateRow = {
+  id: string;
+  name: string;
+  day_of_week: number;
+  description?: string | null;
+};
 
-  const [history, setHistory] = useState<any[]>([]);
+type WorkoutHistoryEntry = {
+  id: string;
+  finished_at: string;
+  volume: number | null;
+  completed_exercises: number | null;
+  workouts: { id: string; name: string } | { id: string; name: string }[] | null;
+};
+
+export default function Workouts() {
+  const [workouts, setWorkouts] = useState<WorkoutTemplateRow[]>([]);
+
+  const [history, setHistory] = useState<WorkoutHistoryEntry[]>([]);
 
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -32,6 +48,27 @@ export default function Workouts() {
   const [saving, setSaving] = useState(false);
 
   const navigate = useNavigate();
+
+  async function loadHistory() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("workout_sessions")
+      .select(`id, finished_at, volume, completed_exercises, workouts(id, name)`)
+      .eq("user_id", user.id)
+      .order("finished_at", { ascending: false });
+
+    if (error) {
+      console.error("Erreur chargement historique", error);
+      return;
+    }
+
+    setHistory((data ?? []) as WorkoutHistoryEntry[]);
+  }
 
   useEffect(() => {
     async function load() {
@@ -48,43 +85,6 @@ export default function Workouts() {
 
     load();
   }, []);
-
-  async function loadHistory() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("workout_sessions")
-      .select(
-        `
-        id,
-        finished_at,
-        volume,
-        completed_exercises,
-        workouts(
-          id,
-          name
-        )
-        `,
-      )
-      .eq("user_id", user.id)
-      .order("finished_at", {
-        ascending: false,
-      });
-
-    if (error) {
-      console.error("Erreur chargement historique", error);
-
-      return;
-    }
-
-    setHistory(data ?? []);
-  }
 
   async function handleCreateWorkout() {
     setSaving(true);
@@ -129,6 +129,8 @@ export default function Workouts() {
         "
       >
         <button
+          type="button"
+          aria-pressed={activeTab === "program"}
           onClick={() => setSearchParams({})}
           className={`
           flex-1
@@ -144,6 +146,8 @@ export default function Workouts() {
         </button>
 
         <button
+          type="button"
+          aria-pressed={activeTab === "history"}
           onClick={() =>
             setSearchParams({
               tab: "history",
@@ -310,20 +314,21 @@ export default function Workouts() {
           "
           >
             {workouts.map((workout) => (
-              <div
+              <button
+                type="button"
                 key={workout.id}
+                onClick={() => navigate(`/workouts/${workout.id}`)}
                 className="
+                group
+                w-full
+                text-left
                 bg-neutral-900
                 rounded-3xl
                 p-5
                 "
               >
-                <div
-                  onClick={() => navigate(`/workouts/${workout.id}`)}
-                  className="
-                  cursor-pointer
-                  "
-                >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
                   <h2
                     className="
                     text-xl
@@ -350,8 +355,10 @@ export default function Workouts() {
                   >
                     {workout.description}
                   </p>
+                  </div>
+                  <ArrowRight size={18} className="mt-1 shrink-0 text-neutral-500 transition-transform group-hover:translate-x-1" aria-hidden="true" />
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </>
@@ -367,7 +374,11 @@ export default function Workouts() {
           {history.length === 0 ? (
             <p
               className="
+              rounded-3xl
+              bg-neutral-900
+              p-6
               text-neutral-400
+              text-center
               "
             >
               Aucune séance terminée.
@@ -398,7 +409,7 @@ export default function Workouts() {
                   font-bold
                   "
                 >
-                  {session.workouts?.name ?? "Séance"}
+                  {(Array.isArray(session.workouts) ? session.workouts[0]?.name : session.workouts?.name) ?? "Séance"}
                 </h2>
 
                 <p

@@ -6,6 +6,14 @@ import { supabase } from "../../lib/supabase";
 
 
 type ComparisonPhoto = { id: number; image: string; date: string };
+type ProgressPhoto = {
+  id: number;
+  image: string | null;
+  date: string;
+  category: string;
+  is_reference?: boolean | null;
+  isReference: boolean;
+};
 
 type ImageAlignment = { zoom: number; x: number; y: number };
 const defaultAlignment: ImageAlignment = { zoom: 100, x: 0, y: 0 };
@@ -80,23 +88,23 @@ function PhotoComparisonCard({
           </div>
           <label className="block text-xs text-neutral-400">
             Zoom · {alignment.zoom}%
-            <input type="range" min="70" max="160" step="1" value={alignment.zoom} onChange={(event) => setAlignment((current) => ({ ...current, zoom: Number(event.target.value) }))} className="mt-1 w-full accent-lime-300" aria-label={`Zoom de la photo ${aligning === "before" ? "avant" : "après"}, ${title}`} />
+            <input type="range" min="70" max="160" step="1" value={alignment.zoom} onChange={(event) => setAlignment((current) => ({ ...current, zoom: Number(event.target.value) }))} className="app-accent-range mt-1 w-full" aria-label={`Zoom de la photo ${aligning === "before" ? "avant" : "après"}, ${title}`} />
           </label>
           <div className="grid grid-cols-2 gap-4">
             <label className="block text-xs text-neutral-400">
               Horizontal · {alignment.x}%
-              <input type="range" min="-30" max="30" step="1" value={alignment.x} onChange={(event) => setAlignment((current) => ({ ...current, x: Number(event.target.value) }))} className="mt-1 w-full accent-lime-300" aria-label={`Décalage horizontal de la photo ${aligning === "before" ? "avant" : "après"}, ${title}`} />
+              <input type="range" min="-30" max="30" step="1" value={alignment.x} onChange={(event) => setAlignment((current) => ({ ...current, x: Number(event.target.value) }))} className="app-accent-range mt-1 w-full" aria-label={`Décalage horizontal de la photo ${aligning === "before" ? "avant" : "après"}, ${title}`} />
             </label>
             <label className="block text-xs text-neutral-400">
               Vertical · {alignment.y}%
-              <input type="range" min="-30" max="30" step="1" value={alignment.y} onChange={(event) => setAlignment((current) => ({ ...current, y: Number(event.target.value) }))} className="mt-1 w-full accent-lime-300" aria-label={`Décalage vertical de la photo ${aligning === "before" ? "avant" : "après"}, ${title}`} />
+              <input type="range" min="-30" max="30" step="1" value={alignment.y} onChange={(event) => setAlignment((current) => ({ ...current, y: Number(event.target.value) }))} className="app-accent-range mt-1 w-full" aria-label={`Décalage vertical de la photo ${aligning === "before" ? "avant" : "après"}, ${title}`} />
             </label>
           </div>
           </div>
         </details>
         <label className="mt-4 block text-xs text-neutral-400">
           Opacité de la photo après · {opacity}%
-          <input type="range" min="0" max="100" value={opacity} onChange={(event) => setOpacity(Number(event.target.value))} className="mt-1 w-full accent-lime-300" aria-label={`Opacité de la photo après, ${title}`} />
+          <input type="range" min="0" max="100" value={opacity} onChange={(event) => setOpacity(Number(event.target.value))} className="app-accent-range mt-1 w-full" aria-label={`Opacité de la photo après, ${title}`} />
         </label>
       </>
     </section>
@@ -104,7 +112,7 @@ function PhotoComparisonCard({
 }
 
 export default function BodyPhotos() {
-  const [photos, setPhotos] = useState<any[]>([]);
+  const [photos, setPhotos] = useState<ProgressPhoto[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [filter, setFilter] = useState<"all" | "front" | "side" | "back">(
     "all",
@@ -118,9 +126,7 @@ export default function BodyPhotos() {
 
     if (error) throw error;
 
-    setPhotos(
-      (data ?? []).map((p: any) => ({ ...p, isReference: p.is_reference })),
-    );
+    setPhotos((data ?? []).map((photo) => ({ ...photo, isReference: Boolean(photo.is_reference) })));
   }
 
   const filteredPhotos =
@@ -164,12 +170,14 @@ export default function BodyPhotos() {
   }
 
   useEffect(() => {
-    loadPhotos();
+    // Fetching the gallery is the effect's external data sync.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadPhotos();
   }, []);
 
   function getComparison(category: string) {
     const categoryPhotos = photos
-      .filter((photo) => photo.category === category)
+      .filter((photo): photo is ProgressPhoto & { image: string } => photo.category === category && Boolean(photo.image))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     const last = categoryPhotos[categoryPhotos.length - 1];
@@ -235,7 +243,9 @@ overflow-x-auto
         ].map((item) => (
           <button
             key={item.id}
-            onClick={() => setFilter(item.id as any)}
+            type="button"
+            aria-pressed={filter === item.id}
+            onClick={() => setFilter(item.id as typeof filter)}
             className={`
 px-4
 py-2
@@ -294,14 +304,14 @@ font-bold
         </div>
       </div>
 
-      {photos.length === 0 ? (
+      {filteredPhotos.length === 0 ? (
         <p
           className="
         mt-6
         text-neutral-400
         "
         >
-          Aucune photo enregistrée.
+          {photos.length === 0 ? "Aucune photo enregistrée." : "Aucune photo pour ce filtre."}
         </p>
       ) : (
         <div
@@ -334,6 +344,7 @@ font-bold
                 {photo.image ? (
                   <img
                     src={photo.image}
+                    alt={`${getCategoryName(photo.category)} · ${new Date(photo.date).toLocaleDateString("fr-FR")}`}
                     className="
                     w-full
                     h-full

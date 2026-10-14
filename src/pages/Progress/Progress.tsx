@@ -29,6 +29,8 @@ export default function Progress() {
       "
       >
         <button
+          type="button"
+          aria-pressed={activeTab === "exercises"}
           onClick={() => setActiveTab("exercises")}
           className={`
         flex-1
@@ -43,6 +45,8 @@ export default function Progress() {
         </button>
 
         <button
+          type="button"
+          aria-pressed={activeTab === "body"}
           onClick={() => setActiveTab("body")}
           className={`
         flex-1
@@ -55,6 +59,8 @@ export default function Progress() {
         </button>
 
         <button
+          type="button"
+          aria-pressed={activeTab === "photos"}
           onClick={() => setActiveTab("photos")}
           className={`
         flex-1

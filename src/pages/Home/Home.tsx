@@ -40,8 +40,14 @@ function getSessionDay(date: string) {
   return day === 0 ? 7 : day;
 }
 
+function formatFirstName(name: string | null | undefined) {
+  const firstName = name?.trim().split(/\s+/)[0] ?? "";
+  return firstName ? firstName[0].toLocaleUpperCase("fr-FR") + firstName.slice(1) : "";
+}
+
 export default function Home() {
   const navigate = useNavigate();
+  const [firstName, setFirstName] = useState("");
   const [workouts, setWorkouts] = useState<WorkoutTemplate[]>([]);
   const [completedSessions, setCompletedSessions] = useState<CompletedSession[]>([]);
   const [activeWorkout, setActiveWorkout] = useState<ActiveWorkoutOverview | null>(null);
@@ -58,7 +64,7 @@ export default function Home() {
       if (!user) throw new Error("Utilisateur non authentifié");
 
       const pendingCancellations = await syncPendingActiveWorkoutCancellations(user.id);
-      const [weeklyPlan, activeResult, sessionsResult] = await Promise.all([
+      const [weeklyPlan, activeResult, sessionsResult, profileResult] = await Promise.all([
         getWeeklyWorkoutPlan(),
         supabase.from("active_workout").select("workout_id")
           .eq("user_id", user.id).order("updated_at", { ascending: false }).limit(1).maybeSingle(),
@@ -67,12 +73,14 @@ export default function Home() {
           .eq("user_id", user.id).not("finished_at", "is", null)
           .gte("finished_at", getStartOfCurrentWeek())
           .order("finished_at", { ascending: false }).limit(50),
+        supabase.from("profiles").select("name").eq("user_id", user.id).maybeSingle(),
       ]);
 
       if (activeResult.error) throw activeResult.error;
       if (sessionsResult.error) throw sessionsResult.error;
 
       const history = (sessionsResult.data ?? []) as CompletedSession[];
+      setFirstName(formatFirstName(profileResult.data?.name));
       setWorkouts(weeklyPlan);
       setCompletedSessions(history);
       setCancellationPending(pendingCancellations > 0);
@@ -233,8 +241,10 @@ export default function Home() {
     <div className="home-dashboard">
       <header className="home-welcome">
         <div>
-          <p className="session-kicker">IRONLOG · TON ESPACE</p>
-          <h1 className="text-3xl font-bold">Bonjour, prêt à t’entraîner ?</h1>
+          <h1 className="home-greeting-title">
+            <span>Bonjour{firstName ? ` ${firstName}` : ""} !</span>
+            <span className="home-greeting-subtitle">Prêt à t’entraîner ?</span>
+          </h1>
           <p className="mt-2 text-neutral-400">{getDayName(todayDay)} · {new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}</p>
         </div>
       </header>

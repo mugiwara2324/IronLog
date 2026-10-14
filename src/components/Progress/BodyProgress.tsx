@@ -142,21 +142,7 @@ export default function BodyProgress() {
         ? Number(((item.weight * item.bodyFat) / 100).toFixed(1))
         : undefined;
 
-    const leanMassKg =
-      item.leanMass !== undefined && Number.isFinite(Number(item.leanMass))
-        ? Number(item.leanMass)
-        : item.bodyFat !== undefined && Number.isFinite(Number(item.weight))
-          ? Number(
-              (item.weight - item.weight * (item.bodyFat / 100)).toFixed(1),
-            )
-          : undefined;
 
-    const leanMassPercent =
-      item.leanMass !== undefined && Number.isFinite(Number(item.leanMass))
-        ? Number(((Number(item.leanMass) / item.weight) * 100).toFixed(1))
-        : item.bodyFat !== undefined
-          ? Number((100 - item.bodyFat).toFixed(1))
-          : undefined;
 
     return {
       date: new Date(item.date).toLocaleDateString(),
@@ -164,8 +150,6 @@ export default function BodyProgress() {
       bodyFat: item.bodyFat,
       bodyFatKg,
       muscleMass: item.muscleMass,
-      leanMassKg,
-      leanMassPercent,
     };
   });
 
@@ -351,12 +335,10 @@ export default function BodyProgress() {
         ]}
       />
       <ChartCard
-        title="Evolution masse maigre"
+        title="Evolution masse musculaire"
         data={chartData}
-        toggleOptions={[
-          { label: "%", dataKey: "leanMassPercent", unit: "%" },
-          { label: "kg", dataKey: "leanMassKg", unit: "kg" },
-        ]}
+        dataKey="muscleMass"
+        unit="%"
       />
       {history.length > 0 && (
         <div className="mt-8">

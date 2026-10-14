@@ -10,6 +10,7 @@ import {
 } from "../../services/workoutService";
 import { supabase } from "../../lib/supabase";
 import { syncPendingActiveWorkoutCancellations } from "../../services/activeWorkoutService";
+import { getInitialReps } from "../../utils/reps";
 
 type CompletedSession = {
   id: string;
@@ -26,14 +27,6 @@ function getStartOfCurrentWeek() {
   date.setHours(0, 0, 0, 0);
 
   return date.toISOString();
-}
-
-function getInitialReps(value: unknown) {
-  const text = String(value ?? "");
-  const range = text.match(/(\d+(?:[.,]\d+)?)\s*(?:-|–|—|à|a|to)\s*\d+(?:[.,]\d+)?/i);
-  const afterMultiplier = text.match(/\d+\s*[x×]\s*(\d+(?:[.,]\d+)?)/i);
-  const first = range?.[1] ?? afterMultiplier?.[1] ?? text.match(/\d+(?:[.,]\d+)?/)?.[0] ?? "0";
-  return Number(first.replace(",", "."));
 }
 
 export default function Home() {

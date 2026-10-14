@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { supabase } from "../../lib/supabase";
+import { getInitialReps } from "../../utils/reps";
 
 export default function WorkoutSession() {
   const navigate = useNavigate();
@@ -140,7 +141,7 @@ export default function WorkoutSession() {
       (sortedWorkoutExercises ?? []).map(async (item: any) => {
         const sets = Array.from({ length: item.sets }, () => ({
           weight: item.weight,
-          reps: Number(item.reps),
+          reps: getInitialReps(item.reps),
         }));
 
         const { data: inserted } = await supabase

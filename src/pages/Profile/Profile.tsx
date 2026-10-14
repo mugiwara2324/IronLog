@@ -273,6 +273,7 @@ export default function Profile() {
 
         {showCreate && (
           <CreateProfile
+            onClose={() => setShowCreate(false)}
             onSave={() => {
               setShowCreate(false);
 

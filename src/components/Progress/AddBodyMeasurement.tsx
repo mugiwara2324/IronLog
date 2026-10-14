@@ -73,6 +73,7 @@ export default function AddBodyMeasurement({ onClose, onSave }: Props) {
   return (
     <div
       className="modal-overlay"
+      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
     >
       <div
         className="modal-panel bg-neutral-900 rounded-3xl p-6 w-full max-w-md"

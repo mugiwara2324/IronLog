@@ -10,7 +10,7 @@ interface Props {
 export default function MobileLayout({ children }: Props) {
   const { pathname } = useLocation();
   const isAuthPage = ["/login", "/register", "/reset-password"].includes(pathname);
-  const isFocusedPage = /^\/(workouts\/[^/]+(?:\/edit)?|workout-active\/[^/]+|workout-history\/[^/]+(?:\/edit)?|exercises\/[^/]+(?:\/edit)?)$/.test(pathname);
+  const isFocusedPage = /^\/(exercises(?:\/[^/]+(?:\/edit)?)?|workouts\/[^/]+(?:\/edit)?|workout-active\/[^/]+|workout-history\/[^/]+(?:\/edit)?|session)$/.test(pathname);
 
   return (
     <div className="app-shell">

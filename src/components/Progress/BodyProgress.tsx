@@ -502,11 +502,13 @@ function ChartCard({
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid stroke="var(--line)" strokeDasharray="3 3" />
 
-              <XAxis dataKey="date" />
+              <XAxis dataKey="date" stroke="var(--subtle)" tick={{ fill: "var(--muted)" }} />
 
               <YAxis
+                stroke="var(--subtle)"
+                tick={{ fill: "var(--muted)" }}
                 tickFormatter={(value) =>
                   typeof value === "number"
                     ? `${value}${currentOption.unit}`
@@ -516,12 +518,14 @@ function ChartCard({
 
               <Tooltip
                 formatter={(value: any) => `${value}${currentOption.unit}`}
+                contentStyle={{ backgroundColor: "var(--surface)", borderColor: "var(--line)", color: "var(--page-text)" }}
               />
 
               <Line
                 type="monotone"
                 dataKey={currentOption.dataKey}
                 strokeWidth={3}
+                stroke="var(--accent)"
               />
             </LineChart>
           </ResponsiveContainer>

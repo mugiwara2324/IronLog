@@ -5,9 +5,10 @@ import useBodyScrollLock from "../../hooks/useBodyScrollLock";
 
 interface Props {
   onSave: () => void;
+  onClose: () => void;
 }
 
-export default function CreateProfile({ onSave }: Props) {
+export default function CreateProfile({ onSave, onClose }: Props) {
   const [name, setName] = useState("");
 
   const [age, setAge] = useState("");
@@ -51,6 +52,7 @@ export default function CreateProfile({ onSave }: Props) {
   return (
     <div
       className="modal-overlay"
+      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
     >
       <div
         className="modal-panel bg-neutral-900 rounded-3xl p-6 w-full max-w-md"

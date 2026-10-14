@@ -749,6 +749,14 @@ export default function WorkoutActive() {
 
   return (
     <div>
+      <button
+        type="button"
+        onClick={() => navigate("/")}
+        className="mb-5 rounded-2xl bg-neutral-800 px-4 py-3 font-semibold"
+      >
+        ← Retour à l’accueil
+      </button>
+      <p className="-mt-3 mb-5 text-xs text-neutral-500">Ta séance reste en cours et sera sauvegardée.</p>
       <header className="session-header">
         <div>
           <p className="session-kicker">Entraînement en cours</p>

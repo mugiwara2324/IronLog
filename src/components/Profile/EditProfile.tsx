@@ -1,7 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../auth/AuthProvider";
-import { deleteAccount, updateProfile } from "../../services/profileService";
+import { updateProfile } from "../../services/profileService";
 import useBodyScrollLock from "../../hooks/useBodyScrollLock";
 
 interface Props {
@@ -19,7 +17,6 @@ export default function EditProfile({
 
   onSave,
 }: Props) {
-  const navigate = useNavigate();
   const [name, setName] = useState(profile.name ?? "");
 
   const [age, setAge] = useState(
@@ -55,9 +52,6 @@ export default function EditProfile({
       : "",
   );
 
-  const { signOut } = useAuth();
-
-  const { clearLocalSession } = useAuth();
 
   useBodyScrollLock(true);
 
@@ -80,40 +74,6 @@ export default function EditProfile({
 
     onSave();
 
-    onClose();
-  }
-
-  async function handleSignOut() {
-    await signOut();
-    onClose();
-  }
-
-  async function handleDeleteAccount() {
-    const confirmDelete = window.confirm(
-      "Voulez-vous vraiment supprimer votre compte ? Cette action est irréversible.",
-    );
-
-    if (!confirmDelete) {
-      return;
-    }
-
-    try {
-      await deleteAccount();
-
-      clearLocalSession();
-
-      onClose();
-
-      navigate("/login");
-    } catch (error) {
-      console.error("Erreur lors de la suppression du compte :", error);
-
-      window.alert(
-        "Impossible de supprimer le compte. Veuillez réessayer ou contacter le support.",
-      );
-    }
-
-    // await signOut();
     onClose();
   }
 
@@ -248,35 +208,6 @@ export default function EditProfile({
           Annuler
         </button>
 
-        <button
-          onClick={handleSignOut}
-          className="
-          mt-3
-          w-full
-          bg-neutral-800
-          text-white
-          rounded-2xl
-          py-4
-          font-semibold
-          "
-        >
-          Déconnexion
-        </button>
-
-        <button
-          onClick={handleDeleteAccount}
-          className="
-          mt-3
-          w-full
-          bg-red-600
-          text-white
-          rounded-2xl
-          py-4
-          font-semibold
-          "
-        >
-          Supprimer mon compte
-        </button>
       </div>
     </div>
   );

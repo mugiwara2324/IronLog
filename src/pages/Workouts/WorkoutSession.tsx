@@ -256,10 +256,13 @@ export default function WorkoutSession() {
         "
       >
         {exercises.map((item) => (
-          <div
+          <button
             key={item.id}
+            type="button"
+            aria-pressed={item.done}
             onClick={() => toggleExercise(item.id)}
             className="
+            w-full text-left
             bg-neutral-900
             rounded-3xl
             p-5
@@ -291,7 +294,7 @@ export default function WorkoutSession() {
             >
               {item.sets.length} séries
             </p>
-          </div>
+          </button>
         ))}
       </div>
     </div>

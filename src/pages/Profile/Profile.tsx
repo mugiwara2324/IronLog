@@ -6,8 +6,15 @@ import { getBodyMeasurements } from "../../services/bodyService";
 import CreateProfile from "../../components/Profile/CreateProfile";
 import EditProfile from "../../components/Profile/EditProfile";
 import { createProgramArchive, importProgramArchive, parseProgramArchive, programArchiveToCsv } from "../../services/programArchiveService";
+import { supabase } from "../../lib/supabase";
+import { useAuth } from "../../auth/AuthProvider";
+import { useNavigate } from "react-router-dom";
+import { deleteAccount } from "../../services/profileService";
 
 export default function Profile() {
+  const navigate = useNavigate();
+  const { signOut, clearLocalSession } = useAuth();
+  const [accountBusy, setAccountBusy] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [archiveBusy, setArchiveBusy] = useState(false);
   const [archiveMessage, setArchiveMessage] = useState<string | null>(null);
@@ -137,24 +144,21 @@ export default function Profile() {
       });
     }
 
-    /*
-  =========================
-  Statistiques entrainement
-  =========================
-
-  TEMPORAIREMENT DESACTIVE
-  car encore IndexedDB
-
-  */
-
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: sessions, error: sessionError } = await supabase
+      .from("workout_sessions")
+      .select("id, finished_at, volume, completed_exercises")
+      .eq("user_id", user.id)
+      .not("finished_at", "is", null)
+      .order("finished_at", { ascending: false });
+    if (sessionError) throw sessionError;
+    const history = sessions ?? [];
     setWorkoutStats({
-      sessions: 0,
-
-      volume: 0,
-
-      exercises: 0,
-
-      last: null,
+      sessions: history.length,
+      volume: history.reduce((sum, item) => sum + Number(item.volume ?? 0), 0),
+      exercises: history.reduce((sum, item) => sum + Number(item.completed_exercises ?? 0), 0),
+      last: history[0]?.finished_at ?? null,
     });
   }
 
@@ -541,7 +545,7 @@ export default function Profile() {
         </div>
       </div>
 
-      <details className="mt-6 rounded-2xl border border-white/10 bg-neutral-900/70 px-5 py-4">
+      <details className="program-archive mt-6 rounded-2xl px-5 py-4">
         <summary className="cursor-pointer text-sm font-semibold text-neutral-200">Importer / exporter mon programme</summary>
         <p className="mt-3 text-sm text-neutral-400">Sauvegarde ou réutilise tes séances programmées et leurs exercices. L’historique d’entraînement n’est pas inclus.</p>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -553,6 +557,19 @@ export default function Profile() {
         {archiveMessage && <p role="status" className="mt-3 text-sm text-lime-300">{archiveMessage}</p>}
         {archiveError && <p role="alert" className="mt-3 text-sm text-red-400">{archiveError}</p>}
       </details>
+
+      <section className="mt-6 rounded-3xl bg-neutral-900 p-6">
+        <h2 className="text-lg font-bold">Compte</h2>
+        <p className="mt-1 text-sm text-neutral-400">Les actions de compte sont séparées de la modification du profil.</p>
+        <button disabled={accountBusy} onClick={async () => { setAccountBusy(true); try { await signOut(); } finally { setAccountBusy(false); } }} className="mt-4 w-full rounded-2xl bg-neutral-800 py-3 font-semibold">Déconnexion</button>
+        <button disabled={accountBusy} onClick={async () => {
+          if (!window.confirm("Supprimer définitivement ton compte et toutes les données associées ? Cette action est irréversible.")) return;
+          setAccountBusy(true);
+          try { await deleteAccount(); clearLocalSession(); navigate("/login"); }
+          catch { window.alert("Impossible de supprimer le compte. Réessaie ou contacte le support."); }
+          finally { setAccountBusy(false); }
+        }} className="mt-3 w-full rounded-2xl bg-red-600 py-3 font-semibold text-white">Supprimer mon compte</button>
+      </section>
 
       {showEdit && (
         <EditProfile

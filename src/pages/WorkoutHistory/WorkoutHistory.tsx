@@ -203,25 +203,11 @@ export default function WorkoutHistory() {
             const bestWeight = Math.max(
               ...exercise.sets.map((set: any) => Number(set.weight)),
             );
+            const topSet = [...exercise.sets].sort((a: any, b: any) => Number(b.weight) - Number(a.weight))[0];
 
             return (
-              <div
-                key={exercise.id}
-                className="
-                  bg-neutral-900
-                  rounded-3xl
-                  p-5
-                  cursor-pointer
-                  "
-                onClick={() => setOpenExercise(isOpen ? null : exercise.id)}
-              >
-                <div
-                  className="
-                    flex
-                    justify-between
-                    items-center
-                    "
-                >
+              <section key={exercise.id} className="rounded-3xl bg-neutral-900 p-5">
+                <button type="button" aria-expanded={isOpen} aria-controls={`exercise-sets-${exercise.id}`} onClick={() => setOpenExercise(isOpen ? null : exercise.id)} className="flex w-full items-center justify-between gap-3 rounded-xl text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">
                   <div>
                     <h2 className="text-xl font-bold">{exercise.name}</h2>
 
@@ -231,14 +217,15 @@ export default function WorkoutHistory() {
                   </div>
 
                   <div className="text-right">
-                    <p className="font-bold text-lg">{bestWeight} kg</p>
+                    <p className="font-bold text-lg">{bestWeight} kg × {topSet?.reps ?? "—"}</p>
 
-                    <p className="text-neutral-400 text-sm">meilleur poids</p>
+                    <p className="text-neutral-400 text-sm">{bestWeight === 0 ? "charge saisie · reps" : "meilleure série · reps"}</p>
                   </div>
-                </div>
+                </button>
 
                 {isOpen && (
                   <div
+                    id={`exercise-sets-${exercise.id}`}
                     className="
                         mt-5
                         space-y-3
@@ -264,7 +251,7 @@ export default function WorkoutHistory() {
                     ))}
                   </div>
                 )}
-              </div>
+              </section>
             );
           })
         )}

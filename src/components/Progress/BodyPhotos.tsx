@@ -19,11 +19,11 @@ function PhotoComparisonCard({
   before: ComparisonPhoto;
   after: ComparisonPhoto;
 }) {
-  const [mode, setMode] = useState<"slider" | "overlay">("overlay");
-  const [adjustment, setAdjustment] = useState(50);
+  const [opacity, setOpacity] = useState(50);
   const [aligning, setAligning] = useState<"before" | "after">("after");
   const [beforeAlignment, setBeforeAlignment] = useState<ImageAlignment>(defaultAlignment);
   const [afterAlignment, setAfterAlignment] = useState<ImageAlignment>(defaultAlignment);
+  const [frameRatio, setFrameRatio] = useState(0.8);
   const alignment = aligning === "before" ? beforeAlignment : afterAlignment;
   const setAlignment = aligning === "before" ? setBeforeAlignment : setAfterAlignment;
   const imageTransform = (value: ImageAlignment) => ({
@@ -35,64 +35,33 @@ function PhotoComparisonCard({
     year: "numeric",
   });
 
-  const modes = [
-    { id: "slider", label: "Curseur" },
-    { id: "overlay", label: "Superposition" },
-  ] as const;
-
   return (
     <section className="overflow-hidden rounded-3xl border border-white/5 bg-neutral-900 p-4 sm:p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h4 className="font-semibold">{title}</h4>
           <p className="mt-1 text-xs text-neutral-500">
-            {mode === "slider" ? "Fais glisser pour comparer" : "Règle le cadrage puis l’opacité"}
+            Règle le cadrage puis l’opacité
           </p>
-        </div>
-        <div className="flex rounded-xl bg-neutral-800 p-1" role="group" aria-label={`Mode de comparaison ${title}`}>
-          {modes.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setMode(item.id)}
-              aria-pressed={mode === item.id}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${mode === item.id ? "bg-neutral-600 text-white" : "text-neutral-400 hover:text-white"}`}
-            >
-              {item.label}
-            </button>
-          ))}
         </div>
       </div>
 
-      <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-black">
-        {mode === "slider" ? (
-          <>
-            <img src={after.image} alt={`${title}, après, ${dateLabel(after.date)}`} className="absolute inset-0 h-full w-full object-contain" style={imageTransform(afterAlignment)} />
-            <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - adjustment}% 0 0)` }}>
-              <img src={before.image} alt={`${title}, avant, ${dateLabel(before.date)}`} className="h-full w-full object-contain" style={imageTransform(beforeAlignment)} />
-            </div>
-            <div className="pointer-events-none absolute inset-y-0 z-10" style={{ left: `${adjustment}%` }}>
-              <div className="h-full w-0.5 -translate-x-1/2 bg-white shadow-[0_0_12px_rgba(0,0,0,0.8)]" />
-              <div className="absolute left-1/2 top-1/2 grid h-10 w-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-white/70 bg-black/70 text-white shadow-lg" aria-hidden="true">↔</div>
-            </div>
-          </>
-        ) : (
-          <>
-            <img src={before.image} alt={`${title}, avant, ${dateLabel(before.date)}`} className="absolute inset-0 h-full w-full object-contain" style={imageTransform(beforeAlignment)} />
-            <img
+      <div className="relative mx-auto w-full max-w-xl overflow-hidden rounded-2xl bg-black" style={{ aspectRatio: frameRatio, maxHeight: "72dvh" }}>
+        <>
+          <img src={before.image} alt={`${title}, avant, ${dateLabel(before.date)}`} className="absolute inset-0 h-full w-full object-contain" style={imageTransform(beforeAlignment)} />
+          <img
               src={after.image}
               alt={`${title}, après, ${dateLabel(after.date)}`}
+              onLoad={(event) => { const { naturalWidth, naturalHeight } = event.currentTarget; if (naturalWidth && naturalHeight) setFrameRatio(naturalWidth / naturalHeight); }}
               className="absolute inset-0 h-full w-full object-contain"
-              style={{ ...imageTransform(afterAlignment), opacity: adjustment / 100 }}
+              style={{ ...imageTransform(afterAlignment), opacity: opacity / 100 }}
             />
-          </>
-        )}
+        </>
         <span className="absolute left-3 top-3 rounded-lg bg-black/70 px-2.5 py-1.5 text-xs font-semibold text-white backdrop-blur">Avant · {dateLabel(before.date)}</span>
         <span className="absolute right-3 top-3 rounded-lg bg-black/70 px-2.5 py-1.5 text-xs font-semibold text-white backdrop-blur">Après · {dateLabel(after.date)}</span>
       </div>
 
-      {mode === "overlay" ? (
-        <>
+      <>
         <details className="group mt-4 rounded-2xl border border-white/5 bg-neutral-800/40 p-3">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-neutral-300 [&::-webkit-details-marker]:hidden">
             <span>Réglages de la superposition</span>
@@ -126,17 +95,10 @@ function PhotoComparisonCard({
           </div>
         </details>
         <label className="mt-4 block text-xs text-neutral-400">
-          Opacité de la photo après · {adjustment}%
-          <input type="range" min="0" max="100" value={adjustment} onChange={(event) => setAdjustment(Number(event.target.value))} className="mt-1 w-full accent-lime-300" aria-label={`Opacité de la photo après, ${title}`} />
+          Opacité de la photo après · {opacity}%
+          <input type="range" min="0" max="100" value={opacity} onChange={(event) => setOpacity(Number(event.target.value))} className="mt-1 w-full accent-lime-300" aria-label={`Opacité de la photo après, ${title}`} />
         </label>
-        </>
-      ) : (
-        <label className="mt-4 block">
-          <span className="sr-only">Position du comparateur pour {title}</span>
-          <input type="range" min="0" max="100" value={adjustment} onChange={(event) => setAdjustment(Number(event.target.value))} className="w-full accent-lime-300" aria-label={`Comparer les photos avant et après, ${title}`} />
-          <span className="mt-1 flex justify-between text-xs text-neutral-500"><span>Avant</span><span>Après</span></span>
-        </label>
-      )}
+      </>
     </section>
   );
 }

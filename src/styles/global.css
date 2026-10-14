@@ -22,6 +22,59 @@
   --danger: #ff777e;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #2F2420;
+    --surface: #382b26;
+    --surface-raised: #463630;
+    --surface-high: #57453d;
+    --line: rgba(241, 232, 199, 0.12);
+    --muted: #d0c3ae;
+    --subtle: #ae9e8d;
+    --accent: #849753;
+    --accent-strong: #96a966;
+    --danger: #ff8983;
+    color: #F1E8C7;
+    background: var(--page);
+  }
+  body { color: #F1E8C7; background: radial-gradient(ellipse at 50% -28%, rgba(132,151,83,.14), transparent 48%), var(--page); }
+  .app-shell { color: #F1E8C7; }
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --page: #F1E8C7;
+    --surface: #fbf7e9;
+    --surface-raised: #eee5c5;
+    --surface-high: #e2d8b6;
+    --line: rgba(47, 36, 32, 0.12);
+    --muted: #62574a;
+    --subtle: #786d5e;
+    --accent: #9CA763;
+    --accent-strong: #899451;
+    --danger: #a52e35;
+    color: #2F2420;
+    background: var(--page);
+  }
+  body { color: #2F2420; background: radial-gradient(ellipse at 50% -28%, rgba(156,167,99,.18), transparent 48%), var(--page); }
+  .app-shell { color: #2F2420; }
+  .app-content h1 { color: #2F2420; }
+  .app-content .bg-black { background-color: #ded5ba !important; }
+  .bottom-navigation { border-color: var(--line); background: rgba(251,247,233,.92); box-shadow: 0 18px 56px rgba(47,36,32,.2); }
+  .bottom-navigation a { color: #786d5e; }
+  .auth-card { border-color: var(--line); background: linear-gradient(145deg, #fbf7e9, #eee5c5); box-shadow: 0 30px 90px rgba(47,36,32,.14); }
+  .auth-card input { border-color: var(--line); }
+  .session-summary { background: linear-gradient(135deg, #fbf7e9, #eee5c5); }
+  .set-row, .sync-indicator { border-color: var(--line); background: rgba(47,36,32,.035); }
+  .set-row.is-complete { background: rgba(156,167,99,.14); border-color: rgba(107,122,58,.28); }
+  .session-progress-track { background: rgba(47,36,32,.1); }
+  .exercise-index { border-color: var(--line); background: rgba(47,36,32,.04); color: var(--muted); }
+  .app-content .bg-neutral-900 { box-shadow: 0 14px 38px rgba(47,36,32,.07); }
+  .modal-overlay { background: rgba(47,36,32,.46); }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -166,7 +219,7 @@ input[type="checkbox"] {
 
 .app-content h1 {
   margin-top: 0;
-  color: #f8f9fa;
+  color: inherit;
   font-size: clamp(1.9rem, 5vw, 2.45rem);
   font-weight: 720;
   letter-spacing: -0.055em;
@@ -200,7 +253,7 @@ input[type="checkbox"] {
 .app-content .bg-blue-500 {
   border-color: transparent;
   background-color: var(--accent) !important;
-  color: #15190d !important;
+  color: #202716 !important;
   box-shadow: 0 8px 24px rgba(201, 243, 106, 0.14);
 }
 
@@ -211,7 +264,7 @@ input[type="checkbox"] {
 }
 
 .app-content .text-black {
-  color: #15190d !important;
+  color: #202716 !important;
 }
 
 .app-content .text-neutral-400 {
@@ -658,5 +711,89 @@ input[type="checkbox"] {
   *::after {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* System appearance overrides are kept last so they win over component defaults. */
+@media (prefers-color-scheme: light) {
+  body, .app-shell { color: #2F2420; }
+  input, select, textarea { color: #2F2420; }
+  input::placeholder, textarea::placeholder { color: #786d5e; }
+  .app-content .text-neutral-200, .app-content .text-neutral-300 { color: #51463a !important; }
+  .app-content .text-neutral-400 { color: #62574a !important; }
+  .app-content .text-neutral-500 { color: #786d5e !important; }
+  .app-content .text-lime-300, .app-content .text-lime-400 { color: #63743b !important; }
+  .app-content .bg-neutral-800\/40 { background-color: rgba(47,36,32,.045) !important; }
+  .app-content .border-white\/5, .app-content .border-white\/10 { border-color: var(--line) !important; }
+  .bottom-navigation a.is-active { color: #63743b; }
+  .bottom-navigation a.is-active svg { filter: none; }
+  .modal-panel { color: #2F2420; }
+}
+
+@media (prefers-color-scheme: dark) {
+  body, .app-shell { color: #F1E8C7; }
+  .app-content h1 { color: inherit; }
+  .app-content .program-archive { background: #849753; color: #2F2420; }
+}
+
+@media (prefers-color-scheme: light) {
+  .app-content h1 { color: inherit; }
+  .app-content .program-archive { background: #9CA763; color: #2F2420; }
+}
+
+.app-content .program-archive > summary,
+.app-content .program-archive > p,
+.app-content .program-archive button:not(:disabled) {
+  color: inherit !important;
+}
+
+.app-content .program-archive button {
+  border: 1px solid currentColor;
+  background: transparent !important;
+  color: inherit !important;
+  box-shadow: none;
+}
+
+.app-content .program-archive button:hover { background: rgba(255,255,255,.12) !important; }
+.app-content .program-archive button:disabled { opacity: .65; }
+
+/* Navigation uses the same warm surfaces and green accent as the app. */
+.bottom-navigation {
+  border-color: rgba(241, 232, 199, .18);
+  background: rgba(47, 36, 32, .94);
+  box-shadow: 0 16px 44px rgba(24, 16, 13, .38);
+}
+
+.bottom-navigation a {
+  color: rgba(241, 232, 199, .72);
+}
+
+.bottom-navigation a:hover:not(.is-active) {
+  color: #F1E8C7;
+  background: rgba(241, 232, 199, .08);
+}
+
+.bottom-navigation a.is-active {
+  color: #2F2420;
+  background: #849753;
+  font-weight: 680;
+}
+
+.bottom-navigation a.is-active svg { filter: none; }
+
+@media (prefers-color-scheme: light) {
+  .bottom-navigation {
+    border-color: rgba(47, 36, 32, .14);
+    background: rgba(241, 232, 199, .96);
+    box-shadow: 0 16px 44px rgba(47, 36, 32, .16);
+  }
+  .bottom-navigation a { color: rgba(47, 36, 32, .68); }
+  .bottom-navigation a:hover:not(.is-active) {
+    color: #2F2420;
+    background: rgba(47, 36, 32, .06);
+  }
+  .bottom-navigation a.is-active {
+    color: #2F2420;
+    background: #9CA763;
   }
 }

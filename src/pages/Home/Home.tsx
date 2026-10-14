@@ -131,28 +131,6 @@ export default function Home() {
         throw new Error("Cette séance ne contient aucun exercice.");
       }
 
-      // Une seule séance active à la fois : on remplace celle qui n'a pas été terminée.
-      const { error: deleteExercisesError } = await supabase
-        .from("active_workout_exercises")
-        .delete()
-        .eq("user_id", user.id);
-      if (deleteExercisesError) throw deleteExercisesError;
-
-      const { error: deleteActiveError } = await supabase
-        .from("active_workout")
-        .delete()
-        .eq("user_id", user.id);
-
-      if (deleteActiveError) throw deleteActiveError;
-
-      if (activeWorkoutId) {
-        try {
-          localStorage.removeItem(`ironlog:active-workout:${user.id}:${activeWorkoutId}`);
-        } catch (error) {
-          console.warn("Impossible de nettoyer l’ancien brouillon local :", error);
-        }
-      }
-
       const { error: activeError } = await supabase.from("active_workout").insert({
         user_id: user.id,
         workout_id: workout.id,
@@ -180,7 +158,22 @@ export default function Home() {
         .from("active_workout_exercises")
         .insert(activeExercises);
 
-      if (insertExercisesError) throw insertExercisesError;
+      if (insertExercisesError) {
+        // Roll back only the newly created attempt; keep the previous workout intact.
+        await supabase.from("active_workout").delete().eq("user_id", user.id).eq("workout_id", workout.id);
+        throw insertExercisesError;
+      }
+
+      // The new workout is now fully created. Remove the previous one afterward.
+      const { error: deleteExercisesError } = await supabase
+        .from("active_workout_exercises").delete().eq("user_id", user.id).neq("workout_id", workout.id);
+      if (deleteExercisesError) console.warn("Ancienne séance conservée après démarrage :", deleteExercisesError);
+      const { error: deleteActiveError } = await supabase
+        .from("active_workout").delete().eq("user_id", user.id).neq("workout_id", workout.id);
+      if (deleteActiveError) console.warn("Ancienne séance conservée après démarrage :", deleteActiveError);
+      if (activeWorkoutId) {
+        try { localStorage.removeItem(`ironlog:active-workout:${user.id}:${activeWorkoutId}`); } catch { /* Cache facultatif */ }
+      }
 
       navigate(`/workout-active/${workout.id}`);
     } catch (error: unknown) {

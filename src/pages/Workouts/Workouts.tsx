@@ -115,6 +115,10 @@ export default function Workouts() {
         Mes séances
       </h1>
 
+      <button type="button" onClick={() => navigate("/exercises")} className="mt-4 w-full rounded-2xl bg-neutral-800 px-4 py-3 text-left font-semibold">
+        Parcourir la bibliothèque d’exercices <span aria-hidden="true">→</span>
+      </button>
+
       <div
         className="
         mt-6
@@ -370,7 +374,8 @@ export default function Workouts() {
             </p>
           ) : (
             history.map((session) => (
-              <div
+              <button
+                type="button"
                 key={session.id}
                 onClick={() =>
                   navigate(`/workouts/history/${session.id}`, {
@@ -380,6 +385,7 @@ export default function Workouts() {
                   })
                 }
                 className="
+                w-full text-left
                 bg-neutral-900
                 rounded-3xl
                 p-5
@@ -416,7 +422,7 @@ export default function Workouts() {
                   Exercices :
                   <strong> {session.completed_exercises ?? 0}</strong>
                 </p>
-              </div>
+              </button>
             ))
           )}
         </div>

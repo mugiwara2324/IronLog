@@ -63,6 +63,8 @@ export default function ExerciseFormModal({
   const [results, setResults] = useState<any[]>([]);
 
   const [selectedExercise, setSelectedExercise] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useBodyScrollLock(true);
 
@@ -136,7 +138,11 @@ export default function ExerciseFormModal({
   }
 
   async function save() {
-    if (!name.trim()) return;
+    if (!name.trim() || saving) return;
+    setSaving(true);
+    setSaveError(null);
+
+    try {
 
     /*
       CREATION DANS UNE SEANCE
@@ -199,20 +205,32 @@ export default function ExerciseFormModal({
       EDITION
     */
 
-    if (mode === "edit" && exercise && workoutExercise) {
-      await supabase
-        .from("workout_exercises")
-        .update({
-          sets,
-          reps,
-          weight,
-          notes,
-        })
-        .eq("id", workoutExercise.id);
+    if (mode === "edit" && exercise) {
+      const { error: exerciseError } = await supabase
+        .from("exercises")
+        .update({ name: name.trim(), description, muscles })
+        .eq("id", exercise.id);
+
+      if (exerciseError) throw exerciseError;
+
+      if (workoutExercise) {
+        const { error: workoutExerciseError } = await supabase
+          .from("workout_exercises")
+          .update({ sets, reps, weight, notes })
+          .eq("id", workoutExercise.id);
+
+        if (workoutExerciseError) throw workoutExerciseError;
+      }
 
       onUpdated?.(exercise.id);
 
       onClose();
+    }
+    } catch (error) {
+      console.error("Impossible d’enregistrer l’exercice", error);
+      setSaveError("L’enregistrement a échoué. Vérifie ta connexion puis réessaie.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -329,6 +347,7 @@ export default function ExerciseFormModal({
             </div>
           </div>
 
+          {(mode === "create" || workoutExercise) && <>
           <label className="field-label" htmlFor="exercise-sets">Nombre de séries</label>
           <input
             id="exercise-sets"
@@ -386,10 +405,14 @@ export default function ExerciseFormModal({
             p-3
             "
           />
+          </>}
         </div>
+
+        {saveError && <p role="alert" className="mt-4 text-sm text-red-600">{saveError}</p>}
 
         <button
           onClick={save}
+          disabled={saving}
           className="
           mt-6
           w-full
@@ -400,7 +423,7 @@ export default function ExerciseFormModal({
           font-semibold
           "
         >
-          Ajouter à la séance
+          {saving ? "Enregistrement…" : mode === "create" ? "Ajouter à la séance" : "Enregistrer les modifications"}
         </button>
 
         <button

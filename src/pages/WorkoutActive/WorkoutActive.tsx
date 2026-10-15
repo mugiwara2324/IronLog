@@ -819,7 +819,7 @@ export default function WorkoutActive() {
                   <span className="exercise-index">{item.done ? <Check size={18} aria-hidden="true" /> : String(index + 1).padStart(2, "0")}</span>
                   <span>
                     <span className="exercise-name">{item.exercise?.name ?? "Exercice"}</span>
-                    <span className="exercise-meta">{item.sets.length} séries · {range ? `${range.min}–${range.max} reps` : `${repRange ?? "répétitions libres"} reps`} · {item.workoutExercise?.weight ?? 0} kg</span>
+                    <span className="exercise-meta">{item.sets.length} séries · {range ? (range.min === range.max ? `${range.max} reps` : `${range.min}–${range.max} reps`) : `${repRange ?? "répétitions libres"} reps`} · {item.workoutExercise?.weight ?? 0} kg</span>
                   </span>
                 </span>
                 <span className="exercise-state">

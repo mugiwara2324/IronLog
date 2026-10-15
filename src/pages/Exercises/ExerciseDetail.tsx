@@ -287,6 +287,8 @@ export default function ExerciseDetail() {
           onUpdated={(newExerciseId: string) => {
             setShowEdit(false);
 
+            const query = searchParams.toString();
+            navigate(`/exercises/${newExerciseId}${query ? `?${query}` : ""}`, { replace: true });
             load(newExerciseId);
           }}
         />

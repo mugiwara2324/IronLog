@@ -158,9 +158,14 @@ export default function ExerciseFormModal({
       */
 
       if (!exerciseId) {
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        if (authError) throw authError;
+        if (!authData.user) throw new Error("Connecte-toi pour créer un exercice.");
+
         const { data: newExercise, error } = await supabase
           .from("exercises")
           .insert({
+            user_id: authData.user.id,
             name,
             description,
             muscles,
@@ -206,23 +211,45 @@ export default function ExerciseFormModal({
     */
 
     if (mode === "edit" && exercise) {
-      const { error: exerciseError } = await supabase
-        .from("exercises")
-        .update({ name: name.trim(), description, muscles })
-        .eq("id", exercise.id);
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      if (!authData.user) throw new Error("Connecte-toi pour modifier un exercice.");
 
-      if (exerciseError) throw exerciseError;
+      let savedExerciseId = exercise.id as string;
+      if (exercise.user_id === authData.user.id) {
+        const { error: exerciseError } = await supabase
+          .from("exercises")
+          .update({ name: name.trim(), description, muscles })
+          .eq("id", exercise.id)
+          .eq("user_id", authData.user.id);
+
+        if (exerciseError) throw exerciseError;
+      } else {
+        const { data: copy, error: copyError } = await supabase
+          .from("exercises")
+          .insert({
+            user_id: authData.user.id,
+            name: name.trim(),
+            description,
+            muscles,
+          })
+          .select("id")
+          .single();
+
+        if (copyError) throw copyError;
+        savedExerciseId = copy.id;
+      }
 
       if (workoutExercise) {
         const { error: workoutExerciseError } = await supabase
           .from("workout_exercises")
-          .update({ sets, reps, weight, notes })
+          .update({ exercise_id: savedExerciseId, sets, reps, weight, notes })
           .eq("id", workoutExercise.id);
 
         if (workoutExerciseError) throw workoutExerciseError;
       }
 
-      onUpdated?.(exercise.id);
+      onUpdated?.(savedExerciseId);
 
       onClose();
     }
@@ -250,6 +277,11 @@ export default function ExerciseFormModal({
         </h2>
 
         <div className="mt-6 space-y-4">
+          {mode === "edit" && exercise && !exercise.user_id && (
+            <p className="rounded-2xl bg-neutral-800 p-3 text-sm text-neutral-400">
+              La banque est partagée : tes modifications créeront une copie personnelle.
+            </p>
+          )}
           <div className="relative">
             <label className="field-label" htmlFor="exercise-search">Nom de l’exercice</label>
             <input

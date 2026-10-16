@@ -8,11 +8,14 @@ import EditProfile from "../../components/Profile/EditProfile";
 import { createProgramArchive, importProgramArchive, parseProgramArchive, programArchiveToCsv } from "../../services/programArchiveService";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../auth/AuthProvider";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { deleteAccount } from "../../services/profileService";
+import AppearanceSettings from "../../components/Profile/AppearanceSettings";
+import { Activity, ArrowLeft, ChevronRight, Settings, Target, UserRound } from "lucide-react";
 
 export default function Profile() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { signOut, clearLocalSession } = useAuth();
   const [accountBusy, setAccountBusy] = useState(false);
   const [profile, setProfile] = useState<any>(null);
@@ -235,352 +238,132 @@ export default function Profile() {
     return Math.min(Math.max(progress, 0), 100);
   }
 
-  if (!profile) {
+  const isSettingsPage = pathname === "/profile/settings";
+  const isPersonalPage = pathname === "/profile/personal";
+
+  const backButton = (title: string, subtitle: string) => (
+    <header className="mb-7">
+      <button type="button" onClick={() => navigate("/profile")} className="mb-5 inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-neutral-400 transition hover:bg-neutral-800 hover:text-[var(--page-text)]">
+        <ArrowLeft size={17} aria-hidden="true" /> Retour au profil
+      </button>
+      <h1 className="text-3xl font-bold">{title}</h1>
+      <p className="mt-2 text-sm text-neutral-400">{subtitle}</p>
+    </header>
+  );
+
+  if (isSettingsPage) {
     return (
-      <div>
-        <h1
-          className="
-          text-3xl
-          font-bold
-          "
-        >
-          Profil
-        </h1>
+      <div className="profile-page">
+        {backButton("Réglages", "Personnalise IronLog et gère tes données et ton compte.")}
+        <AppearanceSettings />
 
-        <p
-          className="
-          mt-3
-          text-neutral-400
-          "
-        >
-          Aucun profil créé
-        </p>
+        <section className="mt-5 rounded-3xl border border-[var(--line)] bg-neutral-900 p-5 sm:p-6">
+          <div className="flex items-start gap-4">
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-neutral-800 text-[var(--accent)]"><Activity size={20} aria-hidden="true" /></div>
+            <div>
+              <h2 className="text-lg font-bold">Importer / exporter le programme</h2>
+              <p className="mt-1 text-sm text-neutral-400">Transfère tes séances programmées et leurs exercices. L’historique d’entraînement reste séparé.</p>
+            </div>
+          </div>
+          <div className="mt-5 grid gap-2 sm:grid-cols-3">
+            <button type="button" onClick={() => void exportProgram("json")} disabled={archiveBusy} className="rounded-2xl bg-neutral-800 px-4 py-3 text-sm font-semibold transition hover:bg-neutral-700 disabled:opacity-50">Exporter en JSON</button>
+            <button type="button" onClick={() => void exportProgram("csv")} disabled={archiveBusy} className="rounded-2xl bg-neutral-800 px-4 py-3 text-sm font-semibold transition hover:bg-neutral-700 disabled:opacity-50">Exporter en CSV</button>
+            <button type="button" onClick={() => importFileRef.current?.click()} disabled={archiveBusy} className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black transition disabled:opacity-50">{archiveBusy ? "Traitement…" : "Importer un fichier"}</button>
+            <input ref={importFileRef} type="file" accept=".json,.csv,application/json,text/csv" className="hidden" onChange={(event) => void importProgramFile(event)} aria-label="Choisir un export de programme JSON ou CSV" />
+          </div>
+          {archiveMessage && <p role="status" className="mt-3 text-sm text-lime-300">{archiveMessage}</p>}
+          {archiveError && <p role="alert" className="mt-3 text-sm text-red-400">{archiveError}</p>}
+        </section>
 
-        <button
-          onClick={() => setShowCreate(true)}
-          className="
-          mt-6
-          w-full
-          bg-white
-          text-black
-          rounded-2xl
-          py-4
-          font-semibold
-          "
-        >
-          Créer mon profil
-        </button>
-
-        {showCreate && (
-          <CreateProfile
-            onClose={() => setShowCreate(false)}
-            onSave={() => {
-              setShowCreate(false);
-
-              load();
-            }}
-          />
-        )}
+        <section className="mt-5 rounded-3xl border border-[var(--line)] bg-neutral-900 p-5 sm:p-6">
+          <h2 className="text-lg font-bold">Compte</h2>
+          <p className="mt-1 text-sm text-neutral-400">Déconnexion et suppression de tes données IronLog.</p>
+          <button disabled={accountBusy} onClick={async () => { setAccountBusy(true); try { await signOut(); } finally { setAccountBusy(false); } }} className="mt-5 w-full rounded-2xl bg-neutral-800 py-3.5 font-semibold transition hover:bg-neutral-700 disabled:opacity-50">{accountBusy ? "Patiente…" : "Déconnexion"}</button>
+          <button disabled={accountBusy} onClick={async () => {
+            if (!window.confirm("Supprimer définitivement ton compte et toutes les données associées ? Cette action est irréversible.")) return;
+            setAccountBusy(true);
+            try { await deleteAccount(); clearLocalSession(); navigate("/login"); }
+            catch { window.alert("Impossible de supprimer le compte. Réessaie ou contacte le support."); }
+            finally { setAccountBusy(false); }
+          }} className="mt-3 w-full rounded-2xl border border-red-500/20 bg-red-500/10 py-3.5 font-semibold text-red-500 transition hover:bg-red-500/15 disabled:opacity-50">Supprimer mon compte</button>
+        </section>
       </div>
     );
   }
+
+  if (isPersonalPage) {
+    if (!profile) {
+      return <div>{backButton("Données personnelles", "Tes informations et tes mesures corporelles.")}<p className="rounded-3xl bg-neutral-900 p-5 text-neutral-400">Crée ton profil pour renseigner tes informations personnelles.</p><button type="button" onClick={() => navigate("/profile")} className="mt-4 w-full rounded-2xl bg-white py-4 font-semibold text-black">Retour au profil pour le créer</button></div>;
+    }
+    return (
+      <div className="profile-page">
+        {backButton("Données personnelles", "Tes informations et ta composition corporelle au même endroit.")}
+        <section className="rounded-3xl border border-[var(--line)] bg-neutral-900 p-5 sm:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-400">Informations personnelles</p><h2 className="mt-2 text-2xl font-bold">{profile.name}</h2></div>
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-neutral-800 text-[var(--accent)]"><UserRound size={20} aria-hidden="true" /></div>
+          </div>
+          <div className="mt-5 grid grid-cols-2 gap-3"><ProfileStat label="Âge" value={profile.age ? `${profile.age} ans` : "—"} /><ProfileStat label="Taille" value={profile.height ? `${profile.height} cm` : "—"} /></div>
+          <button type="button" onClick={() => setShowEdit(true)} className="mt-5 w-full rounded-2xl bg-white py-3.5 font-semibold text-black">Modifier mes informations</button>
+        </section>
+
+        <section className="mt-5 rounded-3xl border border-[var(--line)] bg-neutral-900 p-5 sm:p-6">
+          <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-400">Dernière mesure</p><h2 className="mt-2 text-xl font-bold">Composition actuelle</h2></div><div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-neutral-800 text-[var(--accent)]"><Activity size={20} aria-hidden="true" /></div></div>
+          {body ? <div className="mt-5 grid grid-cols-2 gap-3"><ProfileStat label="Poids" value={`${body.weight} kg`} /><ProfileStat label="Masse grasse" value={body.bodyFat !== undefined ? `${body.bodyFat}%` : "—"} /><ProfileStat label="Masse musculaire" value={body.muscleMass !== undefined ? `${body.muscleMass}%` : "—"} /><ProfileStat label="Masse maigre" value={body.leanMass !== undefined ? `${body.leanMass} kg` : "—"} /><p className="col-span-2 text-xs text-neutral-400">Mesure du {new Date(body.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</p></div> : <div className="mt-5 rounded-2xl bg-neutral-800 p-4"><p className="text-sm text-neutral-400">Aucune mesure corporelle enregistrée pour le moment.</p><button type="button" onClick={() => navigate("/progress")} className="mt-3 text-sm font-semibold text-[var(--accent)]">Ajouter une première mesure <span aria-hidden="true">→</span></button></div>}
+        </section>
+        {showEdit && <EditProfile profile={profile} mode="personal" onClose={() => setShowEdit(false)} onSave={() => { void load(); }} />}
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="profile-page">
+        <header className="flex items-start justify-between gap-4">
+          <div><p className="text-sm font-semibold text-neutral-400">Ton espace personnel</p><h1 className="mt-1 text-3xl font-bold">Profil</h1></div>
+          <button type="button" aria-label="Ouvrir les réglages" onClick={() => navigate("/profile/settings")} className="grid size-11 place-items-center rounded-2xl bg-neutral-900 text-neutral-400 transition hover:text-[var(--page-text)]"><Settings size={19} aria-hidden="true" /></button>
+        </header>
+        <section className="mt-6 rounded-3xl border border-[var(--line)] bg-neutral-900 p-6 sm:p-8"><h2 className="text-xl font-bold">Crée ton profil</h2><p className="mt-2 text-sm text-neutral-400">Ajoute tes informations pour suivre tes objectifs et ton évolution.</p><button onClick={() => setShowCreate(true)} className="mt-5 w-full rounded-2xl bg-white py-4 font-semibold text-black">Créer mon profil</button></section>
+        {showCreate && <CreateProfile onClose={() => setShowCreate(false)} onSave={() => { setShowCreate(false); void load(); }} />}
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <h1
-        className="
-        text-3xl
-        font-bold
-        "
-      >
-        Profil
-      </h1>
+    <div className="profile-page">
+      <header className="flex items-start justify-between gap-4">
+        <div><p className="text-sm font-semibold text-neutral-400">Ton espace personnel</p><h1 className="mt-1 text-3xl font-bold">Profil</h1></div>
+        <button type="button" aria-label="Ouvrir les réglages" onClick={() => navigate("/profile/settings")} className="grid size-11 place-items-center rounded-2xl border border-[var(--line)] bg-neutral-900 text-neutral-400 transition hover:bg-neutral-800 hover:text-[var(--page-text)]"><Settings size={19} aria-hidden="true" /></button>
+      </header>
 
-      <div
-        className="
-        mt-8
-        bg-neutral-900
-        rounded-3xl
-        p-6
-        "
-      >
-        <h2
-          className="
-          text-2xl
-          font-bold
-          "
-        >
-          {profile.name}
-        </h2>
+      <button type="button" onClick={() => navigate("/profile/personal")} className="mt-6 flex w-full items-center gap-4 rounded-3xl border border-[var(--line)] bg-neutral-900 p-5 text-left transition hover:bg-neutral-800 sm:p-6">
+        <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-neutral-800 text-[var(--accent)]"><UserRound size={21} aria-hidden="true" /></span>
+        <span className="min-w-0 flex-1"><span className="block text-xs font-semibold uppercase tracking-[0.13em] text-neutral-400">Informations & mesures</span><span className="mt-1 block truncate text-lg font-bold">{profile.name}</span><span className="mt-1 block text-sm text-neutral-400">Données personnelles et composition actuelle</span></span>
+        <ChevronRight className="shrink-0 text-neutral-400" size={20} aria-hidden="true" />
+      </button>
 
-        <p className="mt-3">{profile.age} ans</p>
-
-        <p>{profile.height} cm</p>
-
-        <p
-          className="
-          mt-3
-          text-neutral-400
-          "
-        >
-          Objectif : {profile.goal || "-"}
-        </p>
-
-        <button
-          onClick={() => setShowEdit(true)}
-          className="
-          mt-6
-          w-full
-          bg-white
-          text-black
-          rounded-2xl
-          py-4
-          font-semibold
-          "
-        >
-          Modifier le profil
-        </button>
-      </div>
-
-      {body && (
-        <div
-          className="
-          mt-6
-          bg-neutral-900
-          rounded-3xl
-          p-6
-          "
-        >
-          <h3
-            className="
-            text-xl
-            font-bold
-            "
-          >
-            Composition actuelle
-          </h3>
-
-          <div
-            className="
-            grid
-            grid-cols-2
-            gap-4
-            mt-5
-            "
-          >
-            <ProfileStat label="Poids" value={`${body.weight} kg`} />
-
-            <ProfileStat
-              label="Masse grasse"
-              value={body.bodyFat !== undefined ? `${body.bodyFat}%` : "-"}
-            />
-
-            <ProfileStat
-              label="Muscle"
-              value={
-                body.muscleMass !== undefined ? `${body.muscleMass}%` : "-"
-              }
-            />
-
-            <ProfileStat
-              label="Masse maigre"
-              value={body.leanMass !== undefined ? `${body.leanMass} kg` : "-"}
-            />
-          </div>
+      <section className="mt-7">
+        <div className="mb-4 flex items-center gap-3"><span className="grid size-10 place-items-center rounded-2xl bg-[var(--accent)]/15 text-[var(--accent)]"><Target size={19} aria-hidden="true" /></span><div><h2 className="text-xl font-bold">Objectifs</h2><p className="text-sm text-neutral-400">Tes repères pour la suite</p></div></div>
+        <div className="rounded-3xl border border-[var(--line)] bg-neutral-900 p-5 sm:p-6">
+          {profile.goal && (profile.target_weight || profile.target_body_fat || profile.target_muscle_mass) ? <><p className="text-sm text-neutral-400">{profile.goal}</p><div className="mt-5 space-y-5"><GoalProgress label="Poids" current={body?.weight} target={profile.target_weight} progress={calculateProgress(bodyStart?.weight, body?.weight, profile.target_weight)} /><GoalProgress label="Masse grasse" current={body?.bodyFat} target={profile.target_body_fat} progress={calculateProgress(bodyStart?.bodyFat, body?.bodyFat, profile.target_body_fat)} /><GoalProgress label="Masse musculaire" current={body?.muscleMass} target={profile.target_muscle_mass} progress={calculateProgress(bodyStart?.muscleMass, body?.muscleMass, profile.target_muscle_mass)} /></div></> : <p className="text-sm text-neutral-400">Tu n’as pas encore défini d’objectif personnel.</p>}
+          <button type="button" onClick={() => setShowEdit(true)} className="mt-5 rounded-xl bg-neutral-800 px-4 py-2.5 text-sm font-semibold">{profile.goal ? "Modifier mes objectifs" : "Définir mes objectifs"}</button>
         </div>
-      )}
-
-      {profile.goal && bodyStart && body && (
-        <div
-          className="
-          mt-6
-          bg-neutral-900
-          rounded-3xl
-          p-6
-          "
-        >
-          <h3
-            className="
-            text-xl
-            font-bold
-            "
-          >
-            🎯 Objectifs
-          </h3>
-
-          <p
-            className="
-            mt-2
-            text-neutral-400
-            "
-          >
-            {profile.goal}
-          </p>
-
-          <div
-            className="
-            mt-5
-            space-y-5
-            "
-          >
-            <GoalProgress
-              label="Poids"
-              current={body.weight}
-              target={profile.target_weight}
-              progress={calculateProgress(
-                bodyStart.weight,
-                body.weight,
-                profile.target_weight,
-              )}
-            />
-
-            <GoalProgress
-              label="Masse grasse"
-              current={body.bodyFat}
-              target={profile.target_body_fat}
-              progress={calculateProgress(
-                bodyStart.bodyFat,
-                body.bodyFat,
-                profile.target_body_fat,
-              )}
-            />
-
-            <GoalProgress
-              label="Muscle"
-              current={body.muscleMass}
-              target={profile.target_muscle_mass}
-              progress={calculateProgress(
-                bodyStart.muscleMass,
-                body.muscleMass,
-                profile.target_muscle_mass,
-              )}
-            />
-          </div>
-        </div>
-      )}
-
-      {bodyEvolution && (
-        <div
-          className="
-          mt-6
-          bg-neutral-900
-          rounded-3xl
-          p-6
-          "
-        >
-          <h3
-            className="
-            text-xl
-            font-bold
-            "
-          >
-            Evolution depuis le début
-          </h3>
-
-          <div
-            className="
-            grid
-            grid-cols-2
-            gap-4
-            mt-5
-            "
-          >
-            <ProfileStat
-              label="Poids"
-              value={formatEvolution(bodyEvolution.weight) + " kg"}
-            />
-
-            <ProfileStat
-              label="Masse grasse"
-              value={formatEvolution(bodyEvolution.bodyFat) + " %"}
-            />
-
-            <ProfileStat
-              label="Muscle"
-              value={formatEvolution(bodyEvolution.muscleMass) + " %"}
-            />
-
-            <ProfileStat
-              label="Masse maigre"
-              value={formatEvolution(bodyEvolution.leanMass) + " kg"}
-            />
-          </div>
-        </div>
-      )}
-
-      <div
-        className="
-        mt-6
-        bg-neutral-900
-        rounded-3xl
-        p-6
-        "
-      >
-        <h3
-          className="
-          text-xl
-          font-bold
-          "
-        >
-          Entraînement
-        </h3>
-
-        <div
-          className="
-          grid
-          grid-cols-2
-          gap-4
-          mt-5
-          "
-        >
-          <ProfileStat label="Séances" value={`${workoutStats.sessions}`} />
-
-          <ProfileStat
-            label="Volume total"
-            value={`${workoutStats.volume.toLocaleString()} kg`}
-          />
-
-          <ProfileStat
-            label="Exercices terminés"
-            value={`${workoutStats.exercises}`}
-          />
-        </div>
-      </div>
-
-      <details className="program-archive mt-6 rounded-2xl px-5 py-4">
-        <summary className="cursor-pointer text-sm font-semibold text-neutral-200">Importer / exporter mon programme</summary>
-        <p className="mt-3 text-sm text-neutral-400">Sauvegarde ou réutilise tes séances programmées et leurs exercices. L’historique d’entraînement n’est pas inclus.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" onClick={() => void exportProgram("json")} disabled={archiveBusy} className="rounded-xl bg-neutral-800 px-3 py-2 text-sm font-medium disabled:opacity-50">Exporter JSON</button>
-          <button type="button" onClick={() => void exportProgram("csv")} disabled={archiveBusy} className="rounded-xl bg-neutral-800 px-3 py-2 text-sm font-medium disabled:opacity-50">Exporter CSV</button>
-          <button type="button" onClick={() => importFileRef.current?.click()} disabled={archiveBusy} className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-black disabled:opacity-50">{archiveBusy ? "Traitement…" : "Importer JSON ou CSV"}</button>
-          <input ref={importFileRef} type="file" accept=".json,.csv,application/json,text/csv" className="hidden" onChange={(event) => void importProgramFile(event)} aria-label="Choisir un export de programme JSON ou CSV" />
-        </div>
-        {archiveMessage && <p role="status" className="mt-3 text-sm text-lime-300">{archiveMessage}</p>}
-        {archiveError && <p role="alert" className="mt-3 text-sm text-red-400">{archiveError}</p>}
-      </details>
-
-      <section className="mt-6 rounded-3xl bg-neutral-900 p-6">
-        <h2 className="text-lg font-bold">Compte</h2>
-        <p className="mt-1 text-sm text-neutral-400">Les actions de compte sont séparées de la modification du profil.</p>
-        <button disabled={accountBusy} onClick={async () => { setAccountBusy(true); try { await signOut(); } finally { setAccountBusy(false); } }} className="mt-4 w-full rounded-2xl bg-neutral-800 py-3 font-semibold">Déconnexion</button>
-        <button disabled={accountBusy} onClick={async () => {
-          if (!window.confirm("Supprimer définitivement ton compte et toutes les données associées ? Cette action est irréversible.")) return;
-          setAccountBusy(true);
-          try { await deleteAccount(); clearLocalSession(); navigate("/login"); }
-          catch { window.alert("Impossible de supprimer le compte. Réessaie ou contacte le support."); }
-          finally { setAccountBusy(false); }
-        }} className="mt-3 w-full rounded-2xl bg-red-600 py-3 font-semibold text-white">Supprimer mon compte</button>
       </section>
 
-      {showEdit && (
-        <EditProfile
-          profile={profile}
-          onClose={() => setShowEdit(false)}
-          onSave={() => {
-            load();
-          }}
-        />
-      )}
+      <section className="mt-7">
+        <div className="mb-4 flex items-center gap-3"><span className="grid size-10 place-items-center rounded-2xl bg-[var(--accent)]/15 text-[var(--accent)]"><Activity size={19} aria-hidden="true" /></span><div><h2 className="text-xl font-bold">Évolution</h2><p className="text-sm text-neutral-400">Depuis ta première mesure</p></div></div>
+        <div className="rounded-3xl border border-[var(--line)] bg-neutral-900 p-5 sm:p-6">
+          {bodyEvolution ? <div className="grid grid-cols-2 gap-3"><ProfileStat label="Poids" value={`${formatEvolution(bodyEvolution.weight)} kg`} /><ProfileStat label="Masse grasse" value={`${formatEvolution(bodyEvolution.bodyFat)} %`} /><ProfileStat label="Masse musculaire" value={`${formatEvolution(bodyEvolution.muscleMass)} %`} /><ProfileStat label="Masse maigre" value={`${formatEvolution(bodyEvolution.leanMass)} kg`} /></div> : <><p className="text-sm text-neutral-400">Enregistre au moins deux mesures pour voir ton évolution.</p><button type="button" onClick={() => navigate("/progress")} className="mt-3 text-sm font-semibold text-[var(--accent)]">Suivre ma progression <span aria-hidden="true">→</span></button></>}
+        </div>
+      </section>
+
+      <section className="mt-7 pb-5">
+        <div className="mb-4 flex items-center gap-3"><span className="grid size-10 place-items-center rounded-2xl bg-[var(--accent)]/15 text-[var(--accent)]"><Activity size={19} aria-hidden="true" /></span><div><h2 className="text-xl font-bold">Entraînement</h2><p className="text-sm text-neutral-400">Ton activité cumulée</p></div></div>
+        <div className="rounded-3xl border border-[var(--line)] bg-neutral-900 p-5 sm:p-6">
+          <div className="grid grid-cols-2 gap-3"><ProfileStat label="Séances terminées" value={`${workoutStats.sessions}`} /><ProfileStat label="Volume total" value={`${workoutStats.volume.toLocaleString()} kg`} /><div className="col-span-2"><ProfileStat label="Exercices terminés" value={`${workoutStats.exercises}`} /></div></div>
+        </div>
+      </section>
+      {showEdit && <EditProfile profile={profile} mode="goals" onClose={() => setShowEdit(false)} onSave={() => { void load(); }} />}
     </div>
   );
 }

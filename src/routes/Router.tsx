@@ -168,6 +168,24 @@ export default function Router() {
               </ProtectedRoute>
             }
           />
+
+          <Route
+            path="/profile/personal"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/profile/settings"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
           </Routes>
         </Suspense>
       </MobileLayout>

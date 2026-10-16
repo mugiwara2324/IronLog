@@ -241,20 +241,19 @@ export default function Profile() {
   const isSettingsPage = pathname === "/profile/settings";
   const isPersonalPage = pathname === "/profile/personal";
 
-  const backButton = (title: string, subtitle: string) => (
+  const backButton = (title: string) => (
     <header className="mb-7">
       <button type="button" onClick={() => navigate("/profile")} className="mb-5 inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-neutral-400 transition hover:bg-neutral-800 hover:text-[var(--page-text)]">
         <ArrowLeft size={17} aria-hidden="true" /> Retour au profil
       </button>
       <h1 className="text-3xl font-bold">{title}</h1>
-      <p className="mt-2 text-sm text-neutral-400">{subtitle}</p>
     </header>
   );
 
   if (isSettingsPage) {
     return (
       <div className="profile-page">
-        {backButton("Réglages", "Personnalise IronLog et gère tes données et ton compte.")}
+        {backButton("Réglages")}
         <AppearanceSettings />
 
         <section className="mt-5 rounded-3xl border border-[var(--line)] bg-neutral-900 p-5 sm:p-6">
@@ -262,7 +261,6 @@ export default function Profile() {
             <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-neutral-800 text-[var(--accent)]"><Activity size={20} aria-hidden="true" /></div>
             <div>
               <h2 className="text-lg font-bold">Importer / exporter le programme</h2>
-              <p className="mt-1 text-sm text-neutral-400">Transfère tes séances programmées et leurs exercices. L’historique d’entraînement reste séparé.</p>
             </div>
           </div>
           <div className="mt-5 grid gap-2 sm:grid-cols-3">
@@ -277,8 +275,7 @@ export default function Profile() {
 
         <section className="mt-5 rounded-3xl border border-[var(--line)] bg-neutral-900 p-5 sm:p-6">
           <h2 className="text-lg font-bold">Compte</h2>
-          <p className="mt-1 text-sm text-neutral-400">Déconnexion et suppression de tes données IronLog.</p>
-          <button disabled={accountBusy} onClick={async () => { setAccountBusy(true); try { await signOut(); } finally { setAccountBusy(false); } }} className="mt-5 w-full rounded-2xl bg-neutral-800 py-3.5 font-semibold transition hover:bg-neutral-700 disabled:opacity-50">{accountBusy ? "Patiente…" : "Déconnexion"}</button>
+          <button disabled={accountBusy} onClick={async () => { setAccountBusy(true); try { await signOut(); } finally { setAccountBusy(false); } }} className="mt-4 w-full rounded-2xl bg-neutral-800 py-3.5 font-semibold transition hover:bg-neutral-700 disabled:opacity-50">{accountBusy ? "Patiente…" : "Déconnexion"}</button>
           <button disabled={accountBusy} onClick={async () => {
             if (!window.confirm("Supprimer définitivement ton compte et toutes les données associées ? Cette action est irréversible.")) return;
             setAccountBusy(true);
@@ -293,11 +290,11 @@ export default function Profile() {
 
   if (isPersonalPage) {
     if (!profile) {
-      return <div>{backButton("Données personnelles", "Tes informations et tes mesures corporelles.")}<p className="rounded-3xl bg-neutral-900 p-5 text-neutral-400">Crée ton profil pour renseigner tes informations personnelles.</p><button type="button" onClick={() => navigate("/profile")} className="mt-4 w-full rounded-2xl bg-white py-4 font-semibold text-black">Retour au profil pour le créer</button></div>;
+      return <div>{backButton("Données personnelles")}<p className="rounded-3xl bg-neutral-900 p-5 text-neutral-400">Crée ton profil pour renseigner tes informations personnelles.</p><button type="button" onClick={() => navigate("/profile")} className="mt-4 w-full rounded-2xl bg-white py-4 font-semibold text-black">Retour au profil pour le créer</button></div>;
     }
     return (
       <div className="profile-page">
-        {backButton("Données personnelles", "Tes informations et ta composition corporelle au même endroit.")}
+        {backButton("Données personnelles")}
         <section className="rounded-3xl border border-[var(--line)] bg-neutral-900 p-5 sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-400">Informations personnelles</p><h2 className="mt-2 text-2xl font-bold">{profile.name}</h2></div>
@@ -343,7 +340,7 @@ export default function Profile() {
       </button>
 
       <section className="mt-7">
-        <div className="mb-4 flex items-center gap-3"><span className="grid size-10 place-items-center rounded-2xl bg-[var(--accent)]/15 text-[var(--accent)]"><Target size={19} aria-hidden="true" /></span><div><h2 className="text-xl font-bold">Objectifs</h2><p className="text-sm text-neutral-400">Tes repères pour la suite</p></div></div>
+        <div className="mb-4 flex items-center gap-3"><span className="grid size-10 place-items-center rounded-2xl bg-[var(--accent)]/15 text-[var(--accent)]"><Target size={19} aria-hidden="true" /></span><h2 className="text-xl font-bold">Objectifs</h2></div>
         <div className="rounded-3xl border border-[var(--line)] bg-neutral-900 p-5 sm:p-6">
           {profile.goal && (profile.target_weight || profile.target_body_fat || profile.target_muscle_mass) ? <><p className="text-sm text-neutral-400">{profile.goal}</p><div className="mt-5 space-y-5"><GoalProgress label="Poids" current={body?.weight} target={profile.target_weight} progress={calculateProgress(bodyStart?.weight, body?.weight, profile.target_weight)} /><GoalProgress label="Masse grasse" current={body?.bodyFat} target={profile.target_body_fat} progress={calculateProgress(bodyStart?.bodyFat, body?.bodyFat, profile.target_body_fat)} /><GoalProgress label="Masse musculaire" current={body?.muscleMass} target={profile.target_muscle_mass} progress={calculateProgress(bodyStart?.muscleMass, body?.muscleMass, profile.target_muscle_mass)} /></div></> : <p className="text-sm text-neutral-400">Tu n’as pas encore défini d’objectif personnel.</p>}
           <button type="button" onClick={() => setShowEdit(true)} className="mt-5 rounded-xl bg-neutral-800 px-4 py-2.5 text-sm font-semibold">{profile.goal ? "Modifier mes objectifs" : "Définir mes objectifs"}</button>
@@ -351,14 +348,14 @@ export default function Profile() {
       </section>
 
       <section className="mt-7">
-        <div className="mb-4 flex items-center gap-3"><span className="grid size-10 place-items-center rounded-2xl bg-[var(--accent)]/15 text-[var(--accent)]"><Activity size={19} aria-hidden="true" /></span><div><h2 className="text-xl font-bold">Évolution</h2><p className="text-sm text-neutral-400">Depuis ta première mesure</p></div></div>
+        <div className="mb-4 flex items-center gap-3"><span className="grid size-10 place-items-center rounded-2xl bg-[var(--accent)]/15 text-[var(--accent)]"><Activity size={19} aria-hidden="true" /></span><h2 className="text-xl font-bold">Évolution</h2></div>
         <div className="rounded-3xl border border-[var(--line)] bg-neutral-900 p-5 sm:p-6">
           {bodyEvolution ? <div className="grid grid-cols-2 gap-3"><ProfileStat label="Poids" value={`${formatEvolution(bodyEvolution.weight)} kg`} /><ProfileStat label="Masse grasse" value={`${formatEvolution(bodyEvolution.bodyFat)} %`} /><ProfileStat label="Masse musculaire" value={`${formatEvolution(bodyEvolution.muscleMass)} %`} /><ProfileStat label="Masse maigre" value={`${formatEvolution(bodyEvolution.leanMass)} kg`} /></div> : <><p className="text-sm text-neutral-400">Enregistre au moins deux mesures pour voir ton évolution.</p><button type="button" onClick={() => navigate("/progress")} className="mt-3 text-sm font-semibold text-[var(--accent)]">Suivre ma progression <span aria-hidden="true">→</span></button></>}
         </div>
       </section>
 
       <section className="mt-7 pb-5">
-        <div className="mb-4 flex items-center gap-3"><span className="grid size-10 place-items-center rounded-2xl bg-[var(--accent)]/15 text-[var(--accent)]"><Activity size={19} aria-hidden="true" /></span><div><h2 className="text-xl font-bold">Entraînement</h2><p className="text-sm text-neutral-400">Ton activité cumulée</p></div></div>
+        <div className="mb-4 flex items-center gap-3"><span className="grid size-10 place-items-center rounded-2xl bg-[var(--accent)]/15 text-[var(--accent)]"><Activity size={19} aria-hidden="true" /></span><h2 className="text-xl font-bold">Entraînement</h2></div>
         <div className="rounded-3xl border border-[var(--line)] bg-neutral-900 p-5 sm:p-6">
           <div className="grid grid-cols-2 gap-3"><ProfileStat label="Séances terminées" value={`${workoutStats.sessions}`} /><ProfileStat label="Volume total" value={`${workoutStats.volume.toLocaleString()} kg`} /><div className="col-span-2"><ProfileStat label="Exercices terminés" value={`${workoutStats.exercises}`} /></div></div>
         </div>

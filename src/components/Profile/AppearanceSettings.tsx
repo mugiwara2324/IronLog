@@ -18,8 +18,7 @@ export default function AppearanceSettings() {
   return (
     <section className="mt-6 rounded-3xl bg-neutral-900 p-6">
       <h2 className="text-lg font-bold">Apparence</h2>
-      <p className="mt-1 text-sm text-neutral-400">Choisis l’apparence d’IronLog.</p>
-      <label className="mt-4 block">
+      <label className="mt-3 block">
         <span className="mb-2 block text-sm font-semibold">Thème</span>
         <select
           value={preference}

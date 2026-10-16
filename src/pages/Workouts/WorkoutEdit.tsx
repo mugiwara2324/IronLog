@@ -35,6 +35,7 @@ type WorkoutExerciseRow = {
   sets: number | string;
   reps: number | string;
   weight: number | string;
+  volume_multiplier?: number;
   exercise?: ExerciseSummary | null;
   exerciseId?: string | number;
 };
@@ -139,7 +140,7 @@ export default function WorkoutEdit() {
     await load();
   }
 
-  function updateExercise(exerciseId: string | number, field: "sets" | "reps" | "weight", value: string) {
+  function updateExercise(exerciseId: string | number, field: "sets" | "reps" | "weight" | "volume_multiplier", value: string | number) {
     setExercises((previous) =>
       previous.map((item) =>
         item.id === exerciseId ? { ...item, [field]: value } : item,
@@ -207,6 +208,7 @@ export default function WorkoutEdit() {
               sets: Number(item.sets),
               reps: String(item.reps).trim(),
               weight: Number(item.weight),
+              volume_multiplier: Number(item.volume_multiplier) === 2 ? 2 : 1,
               order: position,
               order_index: position,
             })
@@ -327,6 +329,10 @@ export default function WorkoutEdit() {
                 <input type="number" min="0" step="0.5" value={item.weight} onChange={(event) => updateExercise(item.id, "weight", event.target.value)} className="w-full rounded-xl bg-neutral-800 p-3" />
               </label>
             </div>
+            <label className="mt-3 flex items-center gap-3 rounded-xl bg-neutral-800 p-3">
+              <input type="checkbox" checked={Number(item.volume_multiplier ?? 1) === 2} onChange={(event) => updateExercise(item.id, "volume_multiplier", event.target.checked ? 2 : 1)} />
+              <span className="text-sm">Compter les deux haltères ou les deux côtés (volume ×2)</span>
+            </label>
 
             <button type="button" onClick={() => void deleteExercise(item.id)} className="mt-4 text-sm font-semibold text-red-400">
               Retirer l’exercice

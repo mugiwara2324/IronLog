@@ -57,6 +57,7 @@ export default function ExerciseFormModal({
   const [reps, setReps] = useState(workoutExercise?.reps ?? "10");
 
   const [weight, setWeight] = useState(workoutExercise?.weight ?? 0);
+  const [volumeMultiplier, setVolumeMultiplier] = useState(workoutExercise?.volume_multiplier ?? 1);
 
   const [notes, setNotes] = useState(workoutExercise?.notes ?? "");
 
@@ -122,6 +123,7 @@ export default function ExerciseFormModal({
       setReps(data[0].reps ?? "10");
 
       setWeight(data[0].weight ?? 0);
+      setVolumeMultiplier(data[0].volume_multiplier ?? 1);
 
       setNotes(data[0].notes ?? "");
     }
@@ -193,6 +195,7 @@ export default function ExerciseFormModal({
         reps,
 
         weight,
+        volume_multiplier: Number(volumeMultiplier) === 2 ? 2 : 1,
 
         notes,
       });
@@ -277,6 +280,7 @@ export default function ExerciseFormModal({
         </h2>
 
         <div className="mt-6 space-y-4">
+          {mode === "create" && <label className="flex items-center gap-3 rounded-xl bg-neutral-800 p-3"><input type="checkbox" checked={Number(volumeMultiplier) === 2} onChange={(event) => setVolumeMultiplier(event.target.checked ? 2 : 1)} /><span className="text-sm">Compter les deux haltères ou les deux côtés (volume ×2)</span></label>}
           {mode === "edit" && exercise && !exercise.user_id && (
             <p className="rounded-2xl bg-neutral-800 p-3 text-sm text-neutral-400">
               La banque est partagée : tes modifications créeront une copie personnelle.

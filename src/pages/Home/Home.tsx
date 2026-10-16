@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, CalendarDays, Check, Dumbbell, Play, RefreshCw, Trash2 } from "lucide-react";
 
@@ -57,6 +57,8 @@ export default function Home() {
   const [cancelling, setCancelling] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [cancellationPending, setCancellationPending] = useState(false);
+  const initialRetryUsed = useRef(false);
+  const initialRetryTimer = useRef<number | null>(null);
 
   async function load() {
     try {
@@ -84,6 +86,7 @@ export default function Home() {
       setWorkouts(weeklyPlan);
       setCompletedSessions(history);
       setCancellationPending(pendingCancellations > 0);
+      setErrorMessage(null);
 
       const plannedToday = weeklyPlan.find((workout) => workout.day_of_week === getCurrentDayOfWeek());
       setSelectedWorkoutId((current) => plannedToday
@@ -114,6 +117,10 @@ export default function Home() {
     } catch (error) {
       console.error("Erreur chargement accueil :", error);
       setErrorMessage("Impossible de charger tes séances.");
+      if (!initialRetryUsed.current && navigator.onLine) {
+        initialRetryUsed.current = true;
+        initialRetryTimer.current = window.setTimeout(() => { void load(); }, 600);
+      }
     } finally {
       setLoading(false);
     }
@@ -124,8 +131,16 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
     const handleOnline = () => void load();
+    const handleFocus = () => { if (document.visibilityState === "visible") void load(); };
     window.addEventListener("online", handleOnline);
-    return () => window.removeEventListener("online", handleOnline);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+      if (initialRetryTimer.current !== null) window.clearTimeout(initialRetryTimer.current);
+    };
   }, []);
 
   async function startWorkout() {

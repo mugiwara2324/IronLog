@@ -35,7 +35,8 @@ export async function recalculateExerciseRecord(
     .select(
       `
       weight,
-      reps
+      reps,
+      volume_multiplier
     `,
     )
     .eq("exercise_id", exerciseId)
@@ -47,9 +48,7 @@ export async function recalculateExerciseRecord(
     return;
   }
 
-  if (!sets || sets.length === 0) {
-    return;
-  }
+  const safeSets = sets ?? [];
 
   /*
     Calcul des records
@@ -61,12 +60,12 @@ export async function recalculateExerciseRecord(
 
   let maxVolume = 0;
 
-  sets.forEach((set: any) => {
+  safeSets.forEach((set: any) => {
     const weight = Number(set.weight);
 
     const reps = Number(set.reps);
 
-    const volume = weight * reps;
+    const volume = weight * reps * (Number(set.volume_multiplier) === 2 ? 2 : 1);
 
     if (weight > maxWeight) {
       maxWeight = weight;

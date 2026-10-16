@@ -733,6 +733,12 @@ input[type="checkbox"] {
 }
 
 @media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
   .app-content {
     padding: 31px 17px calc(118px + env(safe-area-inset-bottom));
   }
@@ -795,7 +801,7 @@ input[type="checkbox"] {
   .set-field input {
     height: 41px;
     padding: 0 8px;
-    font-size: 0.85rem;
+    font-size: 16px;
   }
 
   .set-confirm-button {

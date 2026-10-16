@@ -96,7 +96,8 @@ export default function WorkoutHistoryEdit() {
       .select(
         `
       weight,
-      reps
+      reps,
+      volume_multiplier
     `,
       )
       .eq("session_id", id);
@@ -114,7 +115,7 @@ export default function WorkoutHistoryEdit() {
     let volume = 0;
 
     (updatedSets ?? []).forEach((set: any) => {
-      volume += Number(set.weight) * Number(set.reps);
+      volume += Number(set.weight) * Number(set.reps) * (Number(set.volume_multiplier) === 2 ? 2 : 1);
     });
 
     /*

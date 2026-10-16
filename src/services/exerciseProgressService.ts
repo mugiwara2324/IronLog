@@ -25,7 +25,7 @@ export async function getExerciseProgressPoints(
   const dates = new Map(sessions.map((session) => [session.id, session.finished_at]));
   let query = supabase
     .from("performed_sets")
-    .select("session_id, exercise_id, weight, reps")
+    .select("session_id, exercise_id, weight, reps, volume_multiplier")
     .in("session_id", sessions.map((session) => session.id));
 
   if (exerciseId) query = query.eq("exercise_id", exerciseId);
@@ -50,7 +50,7 @@ export async function getExerciseProgressPoints(
     };
     point.maxWeight = Math.max(point.maxWeight, weight);
     point.maxReps = Math.max(point.maxReps, reps);
-    point.maxVolume = Math.max(point.maxVolume, weight * reps);
+    point.maxVolume = Math.max(point.maxVolume, weight * reps * (Number(set.volume_multiplier) === 2 ? 2 : 1));
     points.set(key, point);
   }
 

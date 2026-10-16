@@ -31,6 +31,7 @@ type WorkoutExerciseInfo = {
   reps?: string | number;
   weight?: string | number;
   sets?: number;
+  volume_multiplier?: number;
 };
 
 type SupabaseActiveExercise = {
@@ -531,7 +532,8 @@ export default function WorkoutActive() {
         ? current
         : best,
     );
-    const volume = Number(bestSet.weight) * Number(bestSet.reps);
+    const multiplier = Number(item.workoutExercise?.volume_multiplier) === 2 ? 2 : 1;
+    const volume = Number(bestSet.weight) * Number(bestSet.reps) * multiplier;
 
     if (!recordData) {
       const { error } = await supabase.from("records").insert({
@@ -585,7 +587,7 @@ export default function WorkoutActive() {
 
       const now = new Date().toISOString();
       const volume = exercises.reduce(
-        (total, item) => total + item.sets.reduce((subtotal, set) => subtotal + Number(set.weight) * Number(set.reps), 0),
+        (total, item) => total + item.sets.reduce((subtotal, set) => subtotal + Number(set.weight) * Number(set.reps) * (Number(item.workoutExercise?.volume_multiplier) === 2 ? 2 : 1), 0),
         0,
       );
 
@@ -610,6 +612,7 @@ export default function WorkoutActive() {
           exercise_id: item.exercise_id,
           weight: Number(set.weight),
           reps: Number(set.reps),
+          volume_multiplier: Number(item.workoutExercise?.volume_multiplier) === 2 ? 2 : 1,
           set_number: index + 1,
         }] : []),
       );

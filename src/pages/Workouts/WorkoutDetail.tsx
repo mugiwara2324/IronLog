@@ -71,7 +71,7 @@ export default function WorkoutDetail() {
     <div>
       <button
         onClick={() => navigate(-1)}
-        className="
+        className="page-back-control
   mb-5
   bg-neutral-800
   rounded-2xl

@@ -33,7 +33,7 @@ export default function Exercises() {
   }
 
   return <div>
-    <button type="button" onClick={() => navigate("/workouts")} className="mb-5 rounded-2xl bg-neutral-800 px-4 py-3 font-semibold">← Retour aux séances</button>
+    <button type="button" onClick={() => navigate("/workouts")} className="page-back-control mb-5 rounded-2xl bg-neutral-800 px-4 py-3 font-semibold">← Retour aux séances</button>
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div><p className="session-kicker">Catalogue</p><h1 className="text-3xl font-bold">Exercices</h1><p className="mt-2 text-neutral-400">Recherche et sélection par groupe musculaire.</p></div>
       <button onClick={() => setShowCreate(true)} className="rounded-2xl bg-white px-5 py-3 font-semibold text-black">Ajouter un exercice</button>

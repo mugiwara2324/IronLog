@@ -128,7 +128,7 @@ export default function WorkoutHistory() {
             navigate("/workouts?tab=history");
           }
         }}
-        className="
+        className="page-back-control
   mb-5
   bg-neutral-800
   rounded-2xl

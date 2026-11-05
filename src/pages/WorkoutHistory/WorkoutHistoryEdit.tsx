@@ -160,6 +160,13 @@ export default function WorkoutHistoryEdit() {
 
   return (
     <div>
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        className="page-back-control mb-5 rounded-2xl bg-neutral-800 px-5 py-3 font-semibold"
+      >
+        ← Retour
+      </button>
       <h1 className="text-3xl font-bold">Modifier la séance</h1>
 
       <div className="mt-6 space-y-4">

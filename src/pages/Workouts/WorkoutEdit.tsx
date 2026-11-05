@@ -252,7 +252,7 @@ export default function WorkoutEdit() {
       <button
         type="button"
         onClick={() => navigate(-1)}
-        className="mb-5 rounded-2xl bg-neutral-800 px-5 py-3 font-semibold"
+        className="page-back-control mb-5 rounded-2xl bg-neutral-800 px-5 py-3 font-semibold"
       >
         ← Retour
       </button>

@@ -104,14 +104,6 @@
   :where(html:not([data-theme])) .bottom-navigation a {
     color: #786d5e;
   }
-  :where(html:not([data-theme])) .auth-card {
-    border-color: var(--line);
-    background: linear-gradient(145deg, #fbf7e9, #eee5c5);
-    box-shadow: 0 30px 90px rgba(47, 36, 32, 0.14);
-  }
-  :where(html:not([data-theme])) .auth-card input {
-    border-color: var(--line);
-  }
   :where(html:not([data-theme])) .session-summary {
     background: linear-gradient(135deg, #fbf7e9, #eee5c5);
   }
@@ -406,7 +398,7 @@ input[type="checkbox"] {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  border-radius: 17px;
+  border-radius: 999px;
   color: #858b95;
   font-size: 0.68rem;
   font-weight: 550;
@@ -427,14 +419,11 @@ input[type="checkbox"] {
 .auth-card {
   width: min(100%, 450px);
   padding: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.085);
-  border-radius: 30px;
-  background: linear-gradient(
-    145deg,
-    rgba(25, 28, 34, 0.98),
-    rgba(17, 19, 24, 0.98)
-  );
-  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: var(--card-shadow);
+  color: var(--page-text);
 }
 
 .auth-card h1 {
@@ -445,13 +434,26 @@ input[type="checkbox"] {
 
 .auth-card input {
   min-height: 52px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  background-color: var(--surface-raised);
+  color: var(--page-text);
+}
+
+.auth-card input::placeholder {
+  color: var(--subtle);
+}
+
+.auth-card input:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .auth-card button[class*="bg-white"] {
   min-height: 54px;
   background-color: var(--accent) !important;
-  color: #15190d !important;
+  color: var(--button-text, var(--page-text)) !important;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 18%, transparent);
   font-weight: 680;
 }
 
@@ -937,8 +939,12 @@ input[type="checkbox"] {
 /* Navigation uses the same warm surfaces and green accent as the app. */
 .bottom-navigation {
   border-color: rgba(241, 232, 199, 0.18);
-  background: rgba(47, 36, 32, 0.94);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
   box-shadow: 0 16px 44px rgba(24, 16, 13, 0.38);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+  backdrop-filter: blur(18px) saturate(145%);
+  transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .bottom-navigation a {
@@ -963,7 +969,7 @@ input[type="checkbox"] {
 @media (prefers-color-scheme: light) {
   :where(html:not([data-theme])) .bottom-navigation {
     border-color: rgba(47, 36, 32, 0.14);
-    background: rgba(241, 232, 199, 0.96);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
     box-shadow: 0 16px 44px rgba(47, 36, 32, 0.16);
   }
   :where(html:not([data-theme])) .bottom-navigation a {
@@ -1539,19 +1545,11 @@ select, select option{
   }
   html[data-theme="light"] .bottom-navigation {
     border-color: var(--line);
-    background: rgba(251, 247, 233, 0.92);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
     box-shadow: 0 18px 56px rgba(47, 36, 32, 0.2);
   }
   html[data-theme="light"] .bottom-navigation a {
     color: #786d5e;
-  }
-  html[data-theme="light"] .auth-card {
-    border-color: var(--line);
-    background: linear-gradient(145deg, #fbf7e9, #eee5c5);
-    box-shadow: 0 30px 90px rgba(47, 36, 32, 0.14);
-  }
-  html[data-theme="light"] .auth-card input {
-    border-color: var(--line);
   }
   html[data-theme="light"] .session-summary {
     background: linear-gradient(135deg, #fbf7e9, #eee5c5);
@@ -1671,7 +1669,7 @@ select, select option{
   }
   html[data-theme="light"] .bottom-navigation {
     border-color: rgba(47, 36, 32, 0.14);
-    background: rgba(241, 232, 199, 0.96);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
     box-shadow: 0 16px 44px rgba(47, 36, 32, 0.16);
   }
   html[data-theme="light"] .bottom-navigation a {
@@ -1726,3 +1724,85 @@ select, select option{
   html[data-theme="light"] .home-plan-day.is-today {
     border-color: #9ca763;
   }
+
+.page-back-control {
+  position: sticky;
+  top: max(10px, env(safe-area-inset-top, 0px));
+  z-index: 50;
+  display: flex;
+  width: fit-content;
+  min-height: 46px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background-color: color-mix(in srgb, var(--surface) 88%, transparent);
+  color: var(--muted);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--page-text) 12%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(150%);
+}
+
+.profile-subpage-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -42px -28px 28px;
+  padding: max(12px, env(safe-area-inset-top, 0px)) 28px 14px;
+  border-bottom: 1px solid var(--line);
+  background-color: color-mix(in srgb, var(--page) 88%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  backdrop-filter: blur(20px) saturate(150%);
+}
+
+.profile-subpage-header .page-back-control {
+  position: static;
+  flex: 0 0 auto;
+  min-height: 42px;
+  padding: 0 13px;
+  box-shadow: none;
+}
+
+.profile-subpage-header h1 {
+  margin: 0;
+  font-size: 1.12rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.app-content .page-back-control {
+  background-color: color-mix(in srgb, var(--surface) 88%, transparent) !important;
+}
+
+.page-back-control:hover {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  color: var(--page-text);
+}
+
+.page-back-control:focus-visible,
+.bottom-navigation a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.bottom-navigation.is-compact {
+  transform: translateX(50%) scale(0.94);
+  transform-origin: center bottom;
+}
+
+@media (max-width: 640px) {
+  .bottom-navigation.is-compact {
+    transform: scale(0.94);
+    transform-origin: center bottom;
+  }
+
+  .profile-subpage-header {
+    margin: -31px -17px 24px;
+    padding: max(12px, env(safe-area-inset-top, 0px)) 17px 12px;
+  }
+}

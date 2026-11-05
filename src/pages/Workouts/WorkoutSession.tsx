@@ -218,7 +218,7 @@ export default function WorkoutSession() {
     <div>
       <button
         onClick={() => navigate(-1)}
-        className="
+        className="page-back-control
   mb-5
   bg-neutral-800
   rounded-2xl

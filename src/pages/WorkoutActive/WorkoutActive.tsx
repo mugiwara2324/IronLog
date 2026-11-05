@@ -758,7 +758,7 @@ export default function WorkoutActive() {
       <button
         type="button"
         onClick={() => navigate("/")}
-        className="mb-5 rounded-2xl bg-neutral-800 px-4 py-3 font-semibold"
+        className="page-back-control mb-5 rounded-2xl bg-neutral-800 px-4 py-3 font-semibold"
       >
         ← Retour à l’accueil
       </button>

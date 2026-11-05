@@ -242,11 +242,11 @@ export default function Profile() {
   const isPersonalPage = pathname === "/profile/personal";
 
   const backButton = (title: string) => (
-    <header className="mb-7">
-      <button type="button" onClick={() => navigate("/profile")} className="mb-5 inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-neutral-400 transition hover:bg-neutral-800 hover:text-[var(--page-text)]">
-        <ArrowLeft size={17} aria-hidden="true" /> Retour au profil
+    <header className="profile-subpage-header">
+      <button type="button" aria-label="Retour au profil" onClick={() => navigate("/profile")} className="page-back-control inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-neutral-400 transition hover:bg-neutral-800 hover:text-[var(--page-text)]">
+        <ArrowLeft size={17} aria-hidden="true" /> Profil
       </button>
-      <h1 className="text-3xl font-bold">{title}</h1>
+      <h1>{title}</h1>
     </header>
   );
 
@@ -317,7 +317,7 @@ export default function Profile() {
     return (
       <div className="profile-page">
         <header className="flex items-start justify-between gap-4">
-          <div><p className="text-sm font-semibold text-neutral-400">Ton espace personnel</p><h1 className="mt-1 text-3xl font-bold">Profil</h1></div>
+          <h1 className="text-3xl font-bold">Profil</h1>
           <button type="button" aria-label="Ouvrir les réglages" onClick={() => navigate("/profile/settings")} className="grid size-11 place-items-center rounded-2xl bg-neutral-900 text-neutral-400 transition hover:text-[var(--page-text)]"><Settings size={19} aria-hidden="true" /></button>
         </header>
         <section className="mt-6 rounded-3xl border border-[var(--line)] bg-neutral-900 p-6 sm:p-8"><h2 className="text-xl font-bold">Crée ton profil</h2><p className="mt-2 text-sm text-neutral-400">Ajoute tes informations pour suivre tes objectifs et ton évolution.</p><button onClick={() => setShowCreate(true)} className="mt-5 w-full rounded-2xl bg-white py-4 font-semibold text-black">Créer mon profil</button></section>
@@ -329,7 +329,7 @@ export default function Profile() {
   return (
     <div className="profile-page">
       <header className="flex items-start justify-between gap-4">
-        <div><p className="text-sm font-semibold text-neutral-400">Ton espace personnel</p><h1 className="mt-1 text-3xl font-bold">Profil</h1></div>
+        <h1 className="text-3xl font-bold">Profil</h1>
         <button type="button" aria-label="Ouvrir les réglages" onClick={() => navigate("/profile/settings")} className="grid size-11 place-items-center rounded-2xl border border-[var(--line)] bg-neutral-900 text-neutral-400 transition hover:bg-neutral-800 hover:text-[var(--page-text)]"><Settings size={19} aria-hidden="true" /></button>
       </header>
 

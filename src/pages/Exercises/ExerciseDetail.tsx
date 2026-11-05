@@ -70,7 +70,7 @@ export default function ExerciseDetail() {
     <div>
       <button
         onClick={() => navigate(-1)}
-        className="
+        className="page-back-control
         text-neutral-400
         "
       >

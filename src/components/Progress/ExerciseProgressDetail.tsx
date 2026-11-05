@@ -71,7 +71,7 @@ export default function ExerciseProgressDetail({ exercise, onClose }: Props) {
   }
 
   return <div className="modal-overlay" onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}><div className="modal-panel bg-neutral-900 rounded-3xl p-6 w-full max-w-md" role="dialog" aria-modal="true" aria-labelledby="exercise-progress-title">
-    <button onClick={onClose} className="text-neutral-400">← Retour</button><h2 id="exercise-progress-title" className="text-2xl font-bold mt-6">{exercise.name}</h2>
+    <button onClick={onClose} className="page-back-control text-neutral-400">← Retour</button><h2 id="exercise-progress-title" className="text-2xl font-bold mt-6">{exercise.name}</h2>
     <div className="grid grid-cols-2 gap-3 mt-6"><Stat label="Meilleure charge" value={`${bestWeight} kg`} /><Stat label="Progression" value={`${progression >= 0 ? "+" : ""}${progression} kg`} /><Stat label="Meilleur volume" value={`${bestVolume} kg`} /><Stat label="Reps max" value={`${bestReps}`} /></div>
     <section className="mt-6 rounded-2xl bg-neutral-800 p-4">
       <h3 className="font-bold">Charge de départ des prochaines séances</h3>

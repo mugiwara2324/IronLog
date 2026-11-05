@@ -97,7 +97,7 @@ export default function ExerciseEdit() {
 
   return (
     <div>
-      <button onClick={() => navigate(-1)} className="text-neutral-400">
+      <button onClick={() => navigate(-1)} className="page-back-control text-neutral-400">
         ← Retour
       </button>
 

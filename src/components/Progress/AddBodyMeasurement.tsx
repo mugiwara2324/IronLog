@@ -83,7 +83,7 @@ export default function AddBodyMeasurement({ onClose, onSave }: Props) {
       >
         <button
           onClick={onClose}
-          className="
+          className="page-back-control
 text-neutral-400
 "
         >

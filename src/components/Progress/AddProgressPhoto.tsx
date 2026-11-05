@@ -110,7 +110,7 @@ export default function AddProgressPhoto({ onClose, onSave }: Props) {
       >
         <button
           onClick={onClose}
-          className="
+        className="page-back-control
         text-neutral-400
         "
         >

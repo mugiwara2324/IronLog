@@ -951,9 +951,11 @@ input[type="checkbox"] {
   color: rgba(241, 232, 199, 0.72);
 }
 
-.bottom-navigation a:hover:not(.is-active) {
-  color: #f1e8c7;
-  background: rgba(241, 232, 199, 0.08);
+@media (hover: hover) and (pointer: fine) {
+  .bottom-navigation a:hover:not(.is-active) {
+    color: #f1e8c7;
+    background: rgba(241, 232, 199, 0.08);
+  }
 }
 
 .bottom-navigation a.is-active {
@@ -975,13 +977,16 @@ input[type="checkbox"] {
   :where(html:not([data-theme])) .bottom-navigation a {
     color: rgba(47, 36, 32, 0.68);
   }
-  :where(html:not([data-theme])) .bottom-navigation a:hover:not(.is-active) {
-    color: #2f2420;
-    background: rgba(47, 36, 32, 0.06);
-  }
   :where(html:not([data-theme])) .bottom-navigation a.is-active {
     color: #2f2420;
     background: #9ca763;
+  }
+}
+
+@media (prefers-color-scheme: light) and (hover: hover) and (pointer: fine) {
+  :where(html:not([data-theme])) .bottom-navigation a:hover:not(.is-active) {
+    color: #2f2420;
+    background: rgba(47, 36, 32, 0.06);
   }
 }
 
@@ -1675,9 +1680,11 @@ select, select option{
   html[data-theme="light"] .bottom-navigation a {
     color: rgba(47, 36, 32, 0.68);
   }
-  html[data-theme="light"] .bottom-navigation a:hover:not(.is-active) {
-    color: #2f2420;
-    background: rgba(47, 36, 32, 0.06);
+  @media (hover: hover) and (pointer: fine) {
+    html[data-theme="light"] .bottom-navigation a:hover:not(.is-active) {
+      color: #2f2420;
+      background: rgba(47, 36, 32, 0.06);
+    }
   }
   html[data-theme="light"] .bottom-navigation a.is-active {
     color: #2f2420;

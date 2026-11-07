@@ -23,6 +23,16 @@
   --accent: #c9f36a;
   --accent-strong: #b5e84c;
   --danger: #ff777e;
+
+  --glass-transparency: 22%;
+  --glass-navigation-transparency: 38%;
+  --glass-surface: color-mix(in srgb, var(--surface) calc(100% - var(--glass-transparency)), transparent);
+  --glass-surface-strong: color-mix(in srgb, var(--surface) calc(100% - var(--glass-transparency)), transparent);
+  --glass-surface-raised: color-mix(in srgb, var(--surface-raised) calc(100% - var(--glass-transparency)), transparent);
+  --glass-navigation: color-mix(in srgb, var(--surface) calc(100% - var(--glass-navigation-transparency)), transparent);
+  --glass-border: color-mix(in srgb, var(--page-text) 12%, transparent);
+  --glass-highlight: color-mix(in srgb, #fff 16%, transparent);
+  --glass-filter: blur(22px) saturate(150%);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -1812,4 +1822,134 @@ select, select option{
     margin: -31px -17px 24px;
     padding: max(12px, env(safe-area-inset-top, 0px)) 17px 12px;
   }
+}
+
+/* A restrained glass layer shared by the app's main surfaces. */
+.modal-overlay {
+  -webkit-backdrop-filter: blur(12px) saturate(130%);
+  backdrop-filter: blur(12px) saturate(130%);
+}
+
+.app-content .bg-neutral-900 {
+  border-color: var(--glass-border);
+  background-color: var(--glass-surface-strong) !important;
+  box-shadow: var(--card-shadow), inset 0 1px 0 var(--glass-highlight);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+}
+
+.active-exercise-card,
+.home-start-card,
+.home-week-overview > div,
+.home-plan-day {
+  border-color: var(--glass-border);
+  box-shadow: var(--card-shadow), inset 0 1px 0 var(--glass-highlight);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+}
+
+.active-exercise-card,
+.home-week-overview > div,
+.home-plan-day {
+  background: var(--glass-surface);
+}
+
+.home-start-card {
+  background: linear-gradient(
+    145deg,
+    var(--glass-surface-strong),
+    var(--glass-surface)
+  );
+}
+
+.home-card-icon,
+.home-icon-link {
+  background: var(--glass-surface-raised);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  -webkit-backdrop-filter: blur(12px) saturate(135%);
+  backdrop-filter: blur(12px) saturate(135%);
+}
+
+.bottom-navigation {
+  isolation: isolate;
+  background-color: var(--glass-navigation);
+  border-color: color-mix(in srgb, var(--page-text) 30%, transparent);
+  box-shadow:
+    0 22px 64px color-mix(in srgb, #000 24%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 32%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--page-text) 14%, transparent);
+  -webkit-backdrop-filter: blur(36px) saturate(185%);
+  backdrop-filter: blur(36px) saturate(185%);
+}
+
+.bottom-navigation::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(
+      ellipse at 16% 0%,
+      color-mix(in srgb, #fff 25%, transparent),
+      transparent 54%
+    ),
+    linear-gradient(
+      138deg,
+      color-mix(in srgb, #fff 14%, transparent),
+      transparent 48%,
+      color-mix(in srgb, var(--accent) 12%, transparent)
+    );
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 34%, transparent);
+  content: "";
+  pointer-events: none;
+}
+
+.bottom-navigation::after {
+  position: absolute;
+  z-index: 0;
+  inset: 1px;
+  border: 1px solid color-mix(in srgb, #fff 17%, transparent);
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
+}
+
+.bottom-navigation a {
+  position: relative;
+  z-index: 1;
+}
+
+html[data-theme] .bottom-navigation {
+  background-color: var(--glass-navigation);
+  border-color: color-mix(in srgb, var(--page-text) 30%, transparent);
+  box-shadow:
+    0 22px 64px color-mix(in srgb, #000 24%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 32%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--page-text) 14%, transparent);
+}
+
+html[data-theme] .app-content .bg-neutral-900 {
+  box-shadow: var(--card-shadow), inset 0 1px 0 var(--glass-highlight);
+}
+
+.app-content input.bg-neutral-800:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.app-content select.bg-neutral-800,
+.app-content textarea.bg-neutral-800 {
+  border: 1px solid var(--glass-border);
+  background-color: var(--glass-surface-raised) !important;
+  color: var(--page-text);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  -webkit-backdrop-filter: blur(14px) saturate(135%);
+  backdrop-filter: blur(14px) saturate(135%);
+}
+
+.page-back-control {
+  background-color: var(--glass-surface) !important;
+  border-color: var(--glass-border);
+  box-shadow: var(--card-shadow), inset 0 1px 0 var(--glass-highlight);
+}
+
+.profile-subpage-header {
+  background-color: var(--glass-surface-strong);
+  border-color: var(--glass-border);
 }

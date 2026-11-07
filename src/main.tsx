@@ -6,7 +6,12 @@ import "./styles/global.css";
 // pour ne pas lancer des scripts IndexedDB non désirés. Utiliser le seed côté
 // services si nécessaire (après authentification).
 import { AuthProvider } from "./auth/AuthProvider";
-import { applyThemePreference, getThemePreference } from "./services/themeService";
+import {
+  applyGlassTransparency,
+  applyThemePreference,
+  getGlassTransparency,
+  getThemePreference,
+} from "./services/themeService";
 // import { addExerciseDetails } from "./database/seedDescriptions";
 
 // addExerciseDetails();
@@ -14,6 +19,7 @@ import { applyThemePreference, getThemePreference } from "./services/themeServic
 // seedProgram(); // Désactivé — appeler manuellement via l'UI si besoin
 
 applyThemePreference(getThemePreference());
+applyGlassTransparency(getGlassTransparency());
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
